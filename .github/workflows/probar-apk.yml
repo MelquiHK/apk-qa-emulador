@@ -130,7 +130,7 @@ jobs:
             sleep 2
             adb shell input keyevent 4 || true
             sleep 1
-            python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.PZ4.[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=ms[0] if ms else None; print('fila PZ4 exacta ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
+            python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.PZ4.[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=max(ms,key=lambda p:p[1]) if ms else None; print('fila PZ4 exacta (max-y) ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
             sleep 4
             adb exec-out screencap -p > shots/15-detalle.png || true
             adb shell input keyevent 4 || true
