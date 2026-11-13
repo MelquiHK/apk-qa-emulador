@@ -74,7 +74,7 @@ jobs:
             adb shell input tap 350 2200 || true
             sleep 10
             adb exec-out screencap -p > shots/06-mapa-habana.png || true
-            if ! adb shell pidof me.melqui.luzya > /dev/null 2>&1; then echo "APP MUERTA tras Mapa, relanzando"; adb shell am start -n me.melqui.luzya/.MainActivity; sleep 6; adb shell input tap 350 2200; sleep 8; adb exec-out screencap -p > shots/06-mapa-habana.png || true; fi
+            if ! adb shell pidof me.melqui.luzya > /dev/null 2>&1; then echo "APP MUERTA tras Mapa, relanzando"; adb shell am start -n me.melqui.luzya/.MainActivity; sleep 6; python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Entendido[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=ms[0] if ms else None; print('Entendido ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true; sleep 1; adb shell input tap 350 2200; sleep 8; adb exec-out screencap -p > shots/06-mapa-habana.png || true; fi
             adb shell input swipe 950 170 150 170 400 || true
             sleep 1
             python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Matanzas[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=min(ms,key=lambda p:p[1]) if ms else None; print('chip Matanzas intento 1 ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
@@ -120,7 +120,7 @@ jobs:
             adb shell input swipe 540 1700 540 900 400 || true
             sleep 2
             adb exec-out screencap -p > shots/13-isla-territorio.png || true
-            if ! adb shell pidof me.melqui.luzya > /dev/null 2>&1; then echo "APP MUERTA antes de Circuitos, relanzando"; adb shell am start -n me.melqui.luzya/.MainActivity; sleep 6; fi
+            if ! adb shell pidof me.melqui.luzya > /dev/null 2>&1; then echo "APP MUERTA antes de Circuitos, relanzando"; adb shell am start -n me.melqui.luzya/.MainActivity; sleep 6; python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Entendido[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=ms[0] if ms else None; print('Entendido ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true; sleep 1; fi
             adb shell input tap 540 2200 || true
             sleep 6
             adb exec-out screencap -p > shots/14-circuitos.png || true
