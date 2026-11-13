@@ -49,7 +49,7 @@ jobs:
             cp badging.txt shots/ || true
             adb install -r app.apk 2>&1 | tee shots/instalacion.txt
             adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1
-            sleep 20
+            sleep 25
             python3 -c "import re,subprocess as s,os;s.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True);s.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True);x=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else '';m=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Wait[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].',x)];t=min(m,key=lambda p:p[1]) if m else None;s.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
             sleep 3
             python3 -c "import re,subprocess as s,os;s.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True);s.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True);x=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else '';m=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Saltar[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].',x)];t=min(m,key=lambda p:p[1]) if m else None;s.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
@@ -57,17 +57,20 @@ jobs:
             python3 -c "import re,subprocess as s,os;s.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True);s.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True);x=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else '';m=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Wait[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].',x)];t=min(m,key=lambda p:p[1]) if m else None;s.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
             sleep 2
             python3 -c "import re,subprocess as s,os;s.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True);s.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True);x=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else '';m=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Saltar[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].',x)];t=min(m,key=lambda p:p[1]) if m else None;s.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
-            sleep 8
+            sleep 10
             python3 -c "import re,subprocess as s,os;s.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True);s.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True);x=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else '';m=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*La Habana[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].',x)];t=min(m,key=lambda p:p[1]) if m else None;s.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
-            sleep 4
+            sleep 6
             python3 -c "import re,subprocess as s,os;s.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True);s.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True);x=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else '';m=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*La Habana[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].',x)];t=min(m,key=lambda p:p[1]) if m else None;s.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
-            sleep 8
+            sleep 6
+            python3 -c "import re,subprocess as s,os;s.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True);s.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True);x=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else '';m=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Ahora no[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].',x)];t=min(m,key=lambda p:p[1]) if m else None;s.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
+            sleep 6
             python3 -c "import re,subprocess as s,os;s.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True);s.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True);x=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else '';m=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Wait[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].',x)];t=min(m,key=lambda p:p[1]) if m else None;s.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
             sleep 2
             adb shell input tap 350 2200 || true
             sleep 10
             python3 -c "import re,subprocess as s,os;s.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True);s.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True);x=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else '';m=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Wait[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].',x)];t=min(m,key=lambda p:p[1]) if m else None;s.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
             sleep 2
+            adb exec-out screencap -p > shots/30-tras-provincia.png || true
             adb shell input swipe 950 170 150 170 400 || true
             sleep 1
             python3 -c "import re,subprocess as s,os;s.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True);s.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True);x=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else '';m=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Camagüey[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].',x)];t=min(m,key=lambda p:p[1]) if m else None;s.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
@@ -79,6 +82,8 @@ jobs:
             adb shell input swipe 950 170 150 170 400 || true
             sleep 1
             python3 -c "import re,subprocess as s,os;s.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True);s.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True);x=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else '';m=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Camagüey[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].',x)];t=min(m,key=lambda p:p[1]) if m else None;s.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
+            sleep 1
+            python3 -c "import re,subprocess as s,os;s.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True);s.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True);x=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else '';m=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Wait[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].',x)];t=min(m,key=lambda p:p[1]) if m else None;s.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
             sleep 1
             adb shell input swipe 950 170 150 170 400 || true
             sleep 1
@@ -100,6 +105,14 @@ jobs:
             adb shell input tap 910 2200 || true
             sleep 4
             python3 -c "import re,subprocess as s,os;s.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True);s.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True);x=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else '';m=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Wait[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].',x)];t=min(m,key=lambda p:p[1]) if m else None;s.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
+            sleep 1
+            adb shell input swipe 540 1700 540 900 400 || true
+            sleep 1
+            python3 -c "import re,subprocess as s,os;s.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True);s.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True);x=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else '';m=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Ver el historial de versiones[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].',x)];t=min(m,key=lambda p:p[1]) if m else None;s.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
+            sleep 1
+            adb shell input swipe 540 1700 540 900 400 || true
+            sleep 1
+            python3 -c "import re,subprocess as s,os;s.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True);s.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True);x=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else '';m=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Ver el historial de versiones[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].',x)];t=min(m,key=lambda p:p[1]) if m else None;s.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
             sleep 1
             adb shell input swipe 540 1700 540 900 400 || true
             sleep 1
