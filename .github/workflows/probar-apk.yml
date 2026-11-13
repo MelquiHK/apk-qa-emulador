@@ -56,6 +56,25 @@ jobs:
             adb shell dumpsys activity activities | grep -A2 "topResumedActivity" | head -5 > shots/actividad-top.txt || true
             sleep 5
             adb exec-out screencap -p > shots/02-tras-20s.png || true
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui.xml > /dev/null 2>&1 || true
+            CENTRO=$(python3 -c "
+            import re
+            try:
+                xml = open('shots/ui.xml', encoding='utf-8').read()
+                m = re.search(r'text=\"Saltar\"[^>]*bounds=\"\[(\d+),(\d+)\]\[(\d+),(\d+)\]\"', xml)
+                print(str((int(m.group(1)) + int(m.group(3))) // 2) + ' ' + str((int(m.group(2)) + int(m.group(4))) // 2) if m else '')
+            except Exception:
+                print('')
+            ")
+            echo "centro de Saltar: $CENTRO"
+            if [ -n "$CENTRO" ]; then adb shell input tap $CENTRO; fi
+            sleep 8
+            adb exec-out screencap -p > shots/03-principal.png || true
+            adb shell dumpsys activity activities | grep -A2 "topResumedActivity" | head -5 > shots/actividad-top-2.txt || true
+            adb shell input swipe 540 1600 540 700 400 || true
+            sleep 3
+            adb exec-out screencap -p > shots/04-principal-scroll.png || true
             adb logcat -d > shots/logcat.txt || true
 
       - name: Subir resultados
