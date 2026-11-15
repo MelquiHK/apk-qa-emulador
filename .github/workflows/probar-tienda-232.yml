@@ -1,0 +1,120 @@
+name: Verificacion Tienda 2.3.2 (precio, favoritos, deeplink)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "URL publica del APK a probar"
+        required: true
+        default: "https://tienda-neocharge.vercel.app/descargas/neocharge-tienda.apk"
+      paquete:
+        description: "Package de la app"
+        required: true
+        default: "com.neocharge.tienda"
+      actividad:
+        description: "Actividad principal"
+        required: true
+        default: ".MainActivity"
+
+jobs:
+  emulador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Activar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          ls -la /dev/kvm || echo "SIN /dev/kvm"
+
+      - name: Bajar el APK
+        run: |
+          curl -L -o app.apk "${{ inputs.apk_url }}"
+          ls -la app.apk
+          AAPT=$(ls $ANDROID_HOME/build-tools/*/aapt | sort | tail -1)
+          $AAPT dump badging app.apk | grep -E "package:|sdkVersion" | tee badging.txt
+
+      - name: Correr la verificacion en el emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
+          disable-animations: true
+          script: |
+            mkdir -p shots
+            cp badging.txt shots/ || true
+            adb install -r app.apk 2>&1 | tee shots/instalacion.txt
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1
+            sleep 15
+            adb exec-out screencap -p > shots/01-inicio.png || true
+            python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Tienda.[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=max(ms,key=lambda p:p[1]) if ms else None; print('tab Tienda ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
+            sleep 5
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-tienda.xml > /dev/null 2>&1 || true
+            python3 -c "import re,subprocess,os; xml=open('shots/ui-tienda.xml',encoding='utf-8').read() if os.path.exists('shots/ui-tienda.xml') else ''; m=re.search(r'text=.Cargador de 48V/5A.[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml); x,y=((int(m.group(1))+int(m.group(3)))//2,(int(m.group(2))+int(m.group(4)))//2) if m else (0,0); print('tarjeta 48V/5A ->',x,y,flush=True); subprocess.run(['adb','shell','input','tap',str(x),str(y)]) if m else print('NO VISIBLE 1',flush=True)" || true
+            sleep 1
+            adb shell input swipe 540 1700 540 800 400 || true
+            sleep 2
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-tienda2.xml > /dev/null 2>&1 || true
+            python3 -c "import re,subprocess,os; xml=open('shots/ui-tienda2.xml',encoding='utf-8').read() if os.path.exists('shots/ui-tienda2.xml') else ''; m=re.search(r'text=.Cargador de 48V/5A.[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml); x,y=((int(m.group(1))+int(m.group(3)))//2,(int(m.group(2))+int(m.group(4)))//2) if m else (0,0); print('tarjeta 48V/5A (2) ->',x,y,flush=True); subprocess.run(['adb','shell','input','tap',str(x),str(y)]) if m else print('NO VISIBLE 2',flush=True)" || true
+            sleep 4
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-detalle.xml > /dev/null 2>&1 || true
+            grep -o "47.000" shots/ui-detalle.xml | head -1 > shots/precio-47000.txt || echo "SIN_47000" > shots/precio-47000.txt
+            grep -o "[0-9.]* CUP" shots/ui-detalle.xml | sort -u > shots/precios-cup.txt || true
+            adb exec-out screencap -p > shots/02-detalle.png || true
+            python3 -c "import re,subprocess,os; xml=open('shots/ui-detalle.xml',encoding='utf-8').read() if os.path.exists('shots/ui-detalle.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'content-desc=.Agregar a favoritos.[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml)]; t=ms[0] if ms else None; print('corazon detalle ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else print('SIN CORAZON DETALLE',flush=True)" || true
+            sleep 3
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-detalle-fav.xml > /dev/null 2>&1 || true
+            grep -c "Quitar de favoritos" shots/ui-detalle-fav.xml > shots/detalle-quitar.txt || echo "0" > shots/detalle-quitar.txt
+            adb exec-out screencap -p > shots/03-detalle-fav.png || true
+            adb shell input keyevent 4 || true
+            sleep 2
+            adb shell am force-stop "${{ inputs.paquete }}" || true
+            sleep 2
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || true
+            sleep 14
+            python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Tienda.[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=max(ms,key=lambda p:p[1]) if ms else None; print('tab Tienda 2 ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
+            sleep 5
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-tienda-reapertura.xml > /dev/null 2>&1 || true
+            adb shell input swipe 540 1700 540 800 400 || true
+            sleep 2
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-tienda-reapertura2.xml > /dev/null 2>&1 || true
+            cat shots/ui-tienda-reapertura.xml shots/ui-tienda-reapertura2.xml | grep -c "Quitar de favoritos" > shots/persiste-reapertura.txt || echo "0" > shots/persiste-reapertura.txt
+            adb exec-out screencap -p > shots/04-reapertura.png || true
+            adb shell input swipe 900 400 200 400 300 || true
+            sleep 1
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-chips.xml > /dev/null 2>&1 || true
+            grep -c "Favoritos" shots/ui-chips.xml > shots/chip-tras-reapertura.txt || echo "0" > shots/chip-tras-reapertura.txt
+            python3 -c "import re,subprocess,os; xml=open('shots/ui-chips.xml',encoding='utf-8').read() if os.path.exists('shots/ui-chips.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.[^>]*Favoritos[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml)]; ms=[p for p in ms if p[1]<700]; t=ms[0] if ms else None; print('chip Favoritos ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else print('SIN CHIP',flush=True)" || true
+            sleep 3
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-solo-favoritos.xml > /dev/null 2>&1 || true
+            grep -c "Cargador de 48V/5A" shots/ui-solo-favoritos.xml > shots/filtro-favoritos.txt || echo "0" > shots/filtro-favoritos.txt
+            adb exec-out screencap -p > shots/05-solo-favoritos.png || true
+            adb shell am start -a android.intent.action.VIEW -d "neocharge://auth-callback?code=PRUEBA" "${{ inputs.paquete }}" || true
+            sleep 5
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-deeplink.xml > /dev/null 2>&1 || true
+            grep -c "expiró" shots/ui-deeplink.xml > shots/deeplink-aviso.txt || echo "0" > shots/deeplink-aviso.txt
+            adb exec-out screencap -p > shots/06-deeplink.png || true
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
+            adb logcat -d > shots/logcat.txt || true
+            grep -c "FATAL EXCEPTION" shots/logcat.txt > shots/fatales.txt || echo "0" > shots/fatales.txt
+
+      - name: Subir resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-232
+          path: shots/
+          if-no-files-found: warn
