@@ -51,10 +51,16 @@ jobs:
             adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1
             sleep 15
             adb exec-out screencap -p > shots/01-inicio.png || true
+            adb shell input tap 540 600 || true
+            sleep 1
             adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
             adb shell dumpsys window windows | grep -E "mCurrentFocus|mFocusedApp" > shots/foco.txt || true
             python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Destacado.[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 300<=p[1]<=2150]; t=min(ms,key=lambda p:p[1]) if ms else None; print('tarjeta producto ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else subprocess.run(['adb','shell','input','tap','280','1950'])" || true
-            sleep 6
+            sleep 4
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-tras-toque.xml > /dev/null 2>&1 || true
+            grep -q "Agregar al carrito" shots/ui-tras-toque.xml || adb shell input tap 280 1950 || true
+            sleep 4
             adb exec-out screencap -p > shots/02-detalle.png || true
             python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Inicio.[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=max(ms,key=lambda p:p[1]) if ms else None; print('tab Inicio ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
             sleep 2
