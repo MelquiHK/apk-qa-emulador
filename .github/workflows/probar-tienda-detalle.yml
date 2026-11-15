@@ -1,0 +1,76 @@
+name: Probar detalle de producto Tienda NeoCharge
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "URL publica del APK a probar"
+        required: true
+        default: "https://tienda-neocharge.vercel.app/descargas/neocharge-tienda.apk"
+      paquete:
+        description: "Package de la app"
+        required: true
+        default: "com.neocharge.tienda"
+      actividad:
+        description: "Actividad principal"
+        required: true
+        default: ".MainActivity"
+
+jobs:
+  emulador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Activar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          ls -la /dev/kvm || echo "SIN /dev/kvm"
+
+      - name: Bajar el APK
+        run: |
+          curl -L -o app.apk "${{ inputs.apk_url }}"
+          ls -la app.apk
+          AAPT=$(ls $ANDROID_HOME/build-tools/*/aapt | sort | tail -1)
+          $AAPT dump badging app.apk | grep -E "package:|sdkVersion" | tee badging.txt
+
+      - name: Abrir detalle de un cargador en el emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
+          disable-animations: true
+          script: |
+            mkdir -p shots
+            cp badging.txt shots/ || true
+            adb install -r app.apk 2>&1 | tee shots/instalacion.txt
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1
+            sleep 15
+            adb exec-out screencap -p > shots/01-inicio.png || true
+            python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Cargador de[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 300<=p[1]<=2150]; t=ms[0] if ms else None; print('producto ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else print('SIN PRODUCTO',flush=True)" || true
+            sleep 4
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-detalle.xml > /dev/null 2>&1 || true
+            grep -q "Agregar al carrito" shots/ui-detalle.xml || adb shell input swipe 540 1700 540 800 300 || true
+            grep -q "Agregar al carrito" shots/ui-detalle.xml || python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Cargador de[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 300<=p[1]<=2150]; t=ms[0] if ms else None; print('producto2 ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else print('SIN PRODUCTO 2',flush=True)" || true
+            grep -q "Agregar al carrito" shots/ui-detalle.xml || sleep 4 || true
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-detalle.xml > /dev/null 2>&1 || true
+            adb exec-out screencap -p > shots/02-detalle.png || true
+            grep -o 'text="[^"]*Garant[^"]*"' shots/ui-detalle.xml > shots/garantia.txt || echo "SIN TEXTO DE GARANTIA" > shots/garantia.txt
+            grep -c "Agregar al carrito" shots/ui-detalle.xml > shots/en-detalle.txt || echo "0" > shots/en-detalle.txt
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
+            adb logcat -d > shots/logcat.txt || true
+            grep -c "FATAL EXCEPTION" shots/logcat.txt > shots/fatales.txt || echo "0" > shots/fatales.txt
+
+      - name: Subir resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-tienda-detalle
+          path: shots/
+          if-no-files-found: warn
