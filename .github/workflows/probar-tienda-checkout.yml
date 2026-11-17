@@ -65,17 +65,9 @@ jobs:
             adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
             adb pull /sdcard/ui.xml shots/ui-tienda.xml > /dev/null 2>&1 || true
             adb exec-out screencap -p > shots/02-tienda.png || true
-            python3 -c "import re,subprocess,os; xml=open('shots/ui-tienda.xml',encoding='utf-8').read() if os.path.exists('shots/ui-tienda.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Cargador de[^>]*bounds=.\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 300<=p[1]<=2150]; t=ms[0] if ms else None; print('producto ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else print('SIN PRODUCTO',flush=True)" || true
-            sleep 5
-            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
-            adb pull /sdcard/ui.xml shots/ui-detalle.xml > /dev/null 2>&1 || true
-            grep -q "Agregar al carrito" shots/ui-detalle.xml || adb shell input swipe 540 1700 540 800 300 || true
-            sleep 1
-            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
-            adb pull /sdcard/ui.xml shots/ui-detalle.xml > /dev/null 2>&1 || true
-            adb exec-out screencap -p > shots/03-detalle.png || true
-            python3 -c "import re,subprocess,os; xml=open('shots/ui-detalle.xml',encoding='utf-8').read() if os.path.exists('shots/ui-detalle.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Agregar al carrito.[^>]*bounds=.\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=ms[0] if ms else None; print('agregar ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else print('SIN BOTON AGREGAR',flush=True)" || true
-            sleep 3
+            python3 -c "import re,subprocess,os,time; f=lambda s:[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Agregar.[^>]*bounds=.\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\].', s)]; xml=open('shots/ui-tienda.xml',encoding='utf-8').read() if os.path.exists('shots/ui-tienda.xml') else ''; ms=[p for p in f(xml) if 0<=p[0]<=1080 and 300<=p[1]<=2150]; t=ms[0] if ms else None; print('agregar grid ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else print('SIN AGREGAR EN GRID',flush=True); time.sleep(2); subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui-tienda2.xml'],capture_output=True); xml2=open('shots/ui-tienda2.xml',encoding='utf-8').read() if os.path.exists('shots/ui-tienda2.xml') else ''; ms2=[p for p in f(xml2) if 0<=p[0]<=1080 and 300<=p[1]<=2150]; t2=ms2[0] if ms2 else None; print('agregar grid 2 ->',t2,flush=True); subprocess.run(['adb','shell','input','tap',str(t2[0]),str(t2[1])]) if t2 else None" || true
+            sleep 2
+            adb exec-out screencap -p > shots/03-agregado.png || true
             python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Carrito.[^>]*bounds=.\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=max(ms,key=lambda p:p[1]) if ms else None; print('tab Carrito ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
             sleep 4
             adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
