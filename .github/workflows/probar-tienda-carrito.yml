@@ -1,0 +1,122 @@
+name: Verificacion Carrito Tienda (abrir carrito + scroll)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "URL publica del APK a probar"
+        required: true
+        default: "https://tienda-neocharge.vercel.app/descargas/neocharge-tienda.apk"
+      paquete:
+        description: "Package de la app"
+        required: true
+        default: "com.neocharge.tienda"
+      actividad:
+        description: "Actividad principal"
+        required: true
+        default: ".MainActivity"
+
+jobs:
+  emulador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Activar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          ls -la /dev/kvm || echo "SIN /dev/kvm"
+
+      - name: Bajar el APK
+        run: |
+          curl -L -o app.apk "${{ inputs.apk_url }}"
+          ls -la app.apk
+          md5sum app.apk | tee md5.txt
+
+      - name: Prueba de carrito y scroll en el emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
+          disable-animations: true
+          script: |
+            mkdir -p shots
+            cp md5.txt shots/ || true
+            adb install -r app.apk 2>&1 | tee shots/instalacion.txt
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1
+            sleep 25
+            adb shell am force-stop com.google.android.apps.nexuslauncher || true
+            sleep 2
+            python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; m=re.search(r'text=.Wait.[^>]*bounds=.\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\].', xml) if 'responding' in xml else None; print('ANR Wait ->',m.groups() if m else None,flush=True); subprocess.run(['adb','shell','input','tap',str((int(m.group(1))+int(m.group(3)))//2),str((int(m.group(2))+int(m.group(4)))//2)]) if m else None" || true
+            sleep 3
+            adb exec-out screencap -p > shots/01-inicio.png || true
+            python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Tienda.[^>]*bounds=.\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=max(ms,key=lambda p:p[1]) if ms else None; print('tab Tienda ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
+            sleep 7
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-tienda.xml > /dev/null 2>&1 || true
+            adb exec-out screencap -p > shots/02-tienda.png || true
+            python3 -c "import re,subprocess,os,time; f=lambda s:[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Agregar.[^>]*bounds=.\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\].', s)]; xml=open('shots/ui-tienda.xml',encoding='utf-8').read() if os.path.exists('shots/ui-tienda.xml') else ''; ms=[p for p in f(xml) if 0<=p[0]<=1080 and 300<=p[1]<=2150]; t=ms[0] if ms else None; print('agregar 1 ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else print('SIN AGREGAR 1',flush=True)" || true
+            sleep 3
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-tienda2.xml > /dev/null 2>&1 || true
+            python3 -c "import re,subprocess,os; f=lambda s:[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Agregar.[^>]*bounds=.\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\].', s)]; xml=open('shots/ui-tienda2.xml',encoding='utf-8').read() if os.path.exists('shots/ui-tienda2.xml') else ''; ms=[p for p in f(xml) if 0<=p[0]<=1080 and 300<=p[1]<=2150]; t=ms[0] if ms else None; print('agregar 2 ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else print('SIN AGREGAR 2',flush=True)" || true
+            sleep 3
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-tienda3.xml > /dev/null 2>&1 || true
+            python3 -c "import re,subprocess,os; f=lambda s:[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Agregar.[^>]*bounds=.\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\].', s)]; xml=open('shots/ui-tienda3.xml',encoding='utf-8').read() if os.path.exists('shots/ui-tienda3.xml') else ''; ms=[p for p in f(xml) if 0<=p[0]<=1080 and 300<=p[1]<=2150]; t=ms[1] if len(ms)>1 else (ms[0] if ms else None); print('agregar 3 ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else print('SIN AGREGAR 3',flush=True)" || true
+            sleep 3
+            adb exec-out screencap -p > shots/03-agregados.png || true
+            python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Carrito.[^>]*bounds=.\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=max(ms,key=lambda p:p[1]) if ms else None; print('tab Carrito ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
+            sleep 4
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-carrito.xml > /dev/null 2>&1 || true
+            grep -c "Continuar al pedido" shots/ui-carrito.xml > shots/carrito-ok.txt || echo "0" > shots/carrito-ok.txt
+            grep -c "carrito está vacío" shots/ui-carrito.xml > shots/carrito-vacio.txt || echo "0" > shots/carrito-vacio.txt
+            adb exec-out screencap -p > shots/04-carrito.png || true
+            python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Tienda.[^>]*bounds=.\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=max(ms,key=lambda p:p[1]) if ms else None; print('tab Tienda vuelta ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
+            sleep 3
+            python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Carrito.[^>]*bounds=.\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=max(ms,key=lambda p:p[1]) if ms else None; print('tab Carrito 2 ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
+            sleep 4
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-carrito2.xml > /dev/null 2>&1 || true
+            grep -c "Continuar al pedido" shots/ui-carrito2.xml > shots/carrito-ok2.txt || echo "0" > shots/carrito-ok2.txt
+            adb exec-out screencap -p > shots/05-carrito-vuelta.png || true
+            adb shell am force-stop "${{ inputs.paquete }}" || true
+            sleep 2
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || true
+            sleep 22
+            python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Tienda.[^>]*bounds=.\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=max(ms,key=lambda p:p[1]) if ms else None; print('tab Tienda reinicio ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
+            sleep 6
+            python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Carrito.[^>]*bounds=.\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=max(ms,key=lambda p:p[1]) if ms else None; print('tab Carrito reinicio ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
+            sleep 4
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-carrito3.xml > /dev/null 2>&1 || true
+            grep -c "Continuar al pedido" shots/ui-carrito3.xml > shots/carrito-ok3.txt || echo "0" > shots/carrito-ok3.txt
+            grep -c "carrito está vacío" shots/ui-carrito3.xml > shots/carrito-vacio3.txt || echo "0" > shots/carrito-vacio3.txt
+            adb exec-out screencap -p > shots/06-carrito-reinicio.png || true
+            python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; ms=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'text=.Tienda.[^>]*bounds=.\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\].', xml)]; ms=[p for p in ms if 0<=p[0]<=1080 and 0<=p[1]<=2400]; t=max(ms,key=lambda p:p[1]) if ms else None; print('tab Tienda scroll ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None" || true
+            sleep 5
+            adb shell input swipe 540 1900 540 300 120 || true
+            adb shell input swipe 540 1900 540 300 120 || true
+            adb shell input swipe 540 1900 540 300 120 || true
+            adb exec-out screencap -p > shots/07-scroll.png || true
+            sleep 2
+            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+            adb pull /sdcard/ui.xml shots/ui-scroll.xml > /dev/null 2>&1 || true
+            adb exec-out screencap -p > shots/08-scroll-quieto.png || true
+            adb shell dumpsys gfxinfo "${{ inputs.paquete }}" framestats > shots/gfxinfo.txt || true
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
+            adb logcat -d > shots/logcat.txt || true
+            grep -c "FATAL EXCEPTION" shots/logcat.txt > shots/fatales.txt || echo "0" > shots/fatales.txt
+
+      - name: Subir resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-tienda-carrito
+          path: shots/
+          if-no-files-found: warn
