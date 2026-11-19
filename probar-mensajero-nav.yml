@@ -1,0 +1,198 @@
+name: Probar Mensajero NAVEGACION en emulador
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "URL publica del APK a probar"
+        required: true
+      paquete:
+        description: "Package de la app"
+        required: true
+        default: "com.neocharge.mensajero"
+      actividad:
+        description: "Actividad principal"
+        required: true
+        default: ".MainActivity"
+
+jobs:
+  emulador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Activar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          ls -la /dev/kvm || echo "SIN /dev/kvm"
+
+      - name: Traer tap.py del repo
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            tap.py
+          sparse-checkout-cone-mode: false
+
+      - name: Bajar el APK
+        run: |
+          curl -L -o app.apk "${{ inputs.apk_url }}"
+          ls -la app.apk
+
+      - name: Correr la app en el emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
+          disable-animations: true
+          script: |
+            mkdir -p shots
+            echo "== INSTALAR ==" > shots/checks.txt
+            adb install -r app.apk 2>&1 | tee shots/instalacion.txt
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.ACCESS_FINE_LOCATION || true
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.ACCESS_COARSE_LOCATION || true
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.POST_NOTIFICATIONS || true
+            adb emu geo fix -82.39116 23.13474
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 20
+            python3 tap.py text "Wait"
+            sleep 3
+            python3 tap.py text "Wait"
+            sleep 2
+            python3 tap.py shot shots/01-login.png
+            echo "== LOGIN ==" >> shots/checks.txt
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "mensajero.prueba@neocharge.cu"
+            sleep 1
+            python3 tap.py edit 1
+            sleep 1
+            python3 tap.py type "NeoPrueba-f89168-26"
+            sleep 1
+            python3 tap.py text "Entrar"
+            sleep 15
+            python3 tap.py shot shots/02-dentro.png
+            echo "== TRAS LOGIN ==" >> shots/checks.txt
+            python3 tap.py has "Mis entregas de hoy" >> shots/checks.txt
+            python3 tap.py has "PRUEBA QA" >> shots/checks.txt
+            echo "== BUSQUEDA: d entre 21 y 23 ==" >> shots/checks.txt
+            adb shell input swipe 540 1700 540 800 350
+            adb shell input swipe 540 1700 540 800 350
+            sleep 1
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "d entre 21 y 23"
+            sleep 1
+            python3 tap.py text "Buscar"
+            sleep 6
+            python3 tap.py shot shots/03-busqueda.png
+            adb shell input keyevent 4
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || true
+            sleep 2
+            python3 tap.py has "Calle D entre 21 y 23" >> shots/checks.txt
+            echo "== MAPA DEL RESULTADO (PIN PROPIO) ==" >> shots/checks.txt
+            python3 tap.py text "Mapa"
+            sleep 8
+            python3 tap.py shot shots/04-mapa-pin.png
+            python3 tap.py has "Calle D entre 21 y 23" >> shots/checks.txt
+            python3 tap.py text "Cerrar"
+            sleep 2
+            echo "== IR: NAVEGACION INTERNA (SIN SELECTOR EXTERNO) ==" >> shots/checks.txt
+            python3 tap.py text "Ir"
+            sleep 12
+            python3 tap.py shot shots/05-nav-previa.png
+            python3 tap.py has "Navegación" >> shots/checks.txt
+            python3 tap.py has "Distancia:" >> shots/checks.txt
+            python3 tap.py has "Bicicleta" >> shots/checks.txt
+            python3 tap.py has "Carro" >> shots/checks.txt
+            python3 tap.py has "Ver pasos" >> shots/checks.txt
+            python3 tap.py has "Iniciar" >> shots/checks.txt
+            python3 tap.py has "Llegas" >> shots/checks.txt
+            echo "== LISTA DE PASOS ==" >> shots/checks.txt
+            python3 tap.py text "Ver pasos"
+            sleep 4
+            python3 tap.py shot shots/06-pasos.png
+            python3 tap.py has "Pasos de la ruta" >> shots/checks.txt
+            python3 tap.py text "Cerrar"
+            sleep 2
+            echo "== MODO BICICLETA (RUTA/TIEMPOS CAMBIAN) ==" >> shots/checks.txt
+            python3 tap.py text "Bicicleta"
+            sleep 10
+            python3 tap.py shot shots/07-nav-bici.png
+            python3 tap.py has "Navegación" >> shots/checks.txt
+            python3 tap.py has "Distancia:" >> shots/checks.txt
+            echo "== MODO CARRO ==" >> shots/checks.txt
+            python3 tap.py text "Carro"
+            sleep 10
+            python3 tap.py shot shots/08-nav-carro.png
+            python3 tap.py has "Navegación" >> shots/checks.txt
+            echo "== MODO MOTO OTRA VEZ ==" >> shots/checks.txt
+            python3 tap.py text "Moto"
+            sleep 10
+            python3 tap.py shot shots/09-nav-moto.png
+            echo "== INICIAR: MODO SEGUIR ==" >> shots/checks.txt
+            python3 tap.py text "Iniciar"
+            sleep 8
+            python3 tap.py shot shots/10-siguiendo.png
+            python3 tap.py has "Faltan" >> shots/checks.txt
+            python3 tap.py has "Llegas" >> shots/checks.txt
+            python3 tap.py has "km/h" >> shots/checks.txt
+            python3 tap.py has "Vas por" >> shots/checks.txt
+            python3 tap.py has "Terminar" >> shots/checks.txt
+            echo "== DESVIO: RECALCULA SOLO ==" >> shots/checks.txt
+            adb emu geo fix -82.38000 23.12000
+            sleep 20
+            python3 tap.py shot shots/11-desvio.png
+            python3 tap.py has "Navegación" >> shots/checks.txt
+            python3 tap.py has "Faltan" >> shots/checks.txt
+            adb emu geo fix -82.39116 23.13474
+            sleep 6
+            echo "== TERMINAR NAVEGACION ==" >> shots/checks.txt
+            python3 tap.py text "Terminar"
+            sleep 3
+            python3 tap.py shot shots/12-de-vuelta.png
+            python3 tap.py has "Mis entregas de hoy" >> shots/checks.txt
+            echo "== NAVEGACION DESDE LA ENTREGA ==" >> shots/checks.txt
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || true
+            sleep 3
+            adb shell input swipe 540 800 540 1700 350
+            adb shell input swipe 540 800 540 1700 350
+            sleep 1
+            python3 tap.py desc "Actualizar"
+            sleep 5
+            python3 tap.py switch
+            sleep 2
+            python3 tap.py text "Salí"
+            sleep 10
+            python3 tap.py shot shots/13-sali.png
+            python3 tap.py has "En camino" >> shots/checks.txt
+            python3 tap.py text "Navegar"
+            sleep 12
+            python3 tap.py shot shots/14-nav-entrega.png
+            python3 tap.py has "Navegación" >> shots/checks.txt
+            python3 tap.py has "Iniciar" >> shots/checks.txt
+            python3 tap.py text "Iniciar"
+            sleep 6
+            echo "== LLEGADA A LA ENTREGA ==" >> shots/checks.txt
+            adb emu geo fix -82.39550 23.13850
+            sleep 10
+            python3 tap.py shot shots/15-llegada.png
+            python3 tap.py has "Llegaste" >> shots/checks.txt
+            python3 tap.py text "Volver pa entregar"
+            sleep 4
+            python3 tap.py shot shots/16-entrega-otra-vez.png
+            python3 tap.py has "Marcar entregado" >> shots/checks.txt
+            adb logcat -d > shots/logcat.txt || true
+            grep -c "FATAL EXCEPTION" shots/logcat.txt > shots/fatales.txt || echo "0" > shots/fatales.txt
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
+
+      - name: Subir resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-mensajero-nav
+          path: shots/
+          if-no-files-found: warn
