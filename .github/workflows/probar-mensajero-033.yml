@@ -60,9 +60,12 @@ jobs:
             adb shell pm grant "${{ inputs.paquete }}" android.permission.ACCESS_COARSE_LOCATION || true
             adb shell pm grant "${{ inputs.paquete }}" android.permission.POST_NOTIFICATIONS || true
             adb emu geo fix -82.39116 23.13474
+            adb shell am force-stop com.google.android.apps.nexuslauncher || true
+            sleep 3
             adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
-            sleep 45
-            for i in 1 2 3 4 5 6; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 3; done
+            sleep 60
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
             echo "== (a) LOGIN: SIN AVISO DE GOOGLE NO ACTIVA ==" >> shots/checks.txt
             python3 tap.py shot shots/01-login.png
             python3 tap.py has "Entrar con Google" >> shots/checks.txt
@@ -75,6 +78,7 @@ jobs:
             adb shell pidof "${{ inputs.paquete }}" >> shots/checks.txt || echo "SIN_PROCESO_TRAS_GOOGLE" >> shots/checks.txt
             adb shell input keyevent 4
             sleep 3
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
             python3 tap.py shot shots/02b-tras-google.png
             adb shell pidof "${{ inputs.paquete }}" >> shots/checks.txt || echo "SIN_PROCESO_TRAS_VOLVER" >> shots/checks.txt
             echo "== (d) LOGIN EN RESOLUCION CHICA 720x1280 ==" >> shots/checks.txt
@@ -83,9 +87,8 @@ jobs:
             adb shell am force-stop "${{ inputs.paquete }}"
             sleep 2
             adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
-            sleep 20
-            python3 tap.py text "Wait"
-            sleep 2
+            sleep 25
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
             python3 tap.py shot shots/03-login-chica.png
             python3 tap.py has "Entrar con Google" >> shots/checks.txt
             python3 tap.py has "MapaNC" >> shots/checks.txt
@@ -97,6 +100,7 @@ jobs:
             sleep 1
             python3 tap.py type "NeoPrueba-f89168-26"
             sleep 1
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
             python3 tap.py text "Entrar"
             sleep 5
             python3 tap.py text "Wait"
@@ -106,6 +110,7 @@ jobs:
             python3 tap.py shot shots/04-dentro-chica.png
             python3 tap.py has "Mis entregas de hoy" >> shots/checks.txt
             echo "== (c) MAPA COMPLETO EN CHICA: EL PIE SE LEE COMPLETO ==" >> shots/checks.txt
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
             adb shell input swipe 360 1050 360 500 350
             adb shell input swipe 360 1050 360 500 350
             adb shell input swipe 360 1050 360 500 350
@@ -124,9 +129,8 @@ jobs:
             adb shell am force-stop "${{ inputs.paquete }}"
             sleep 3
             adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
-            sleep 15
-            python3 tap.py text "Wait"
-            sleep 2
+            sleep 18
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
             python3 tap.py has "Mis entregas de hoy" >> shots/checks.txt
             adb shell input swipe 540 1700 540 800 350
             adb shell input swipe 540 1700 540 800 350
@@ -141,6 +145,7 @@ jobs:
             adb shell input swipe 540 800 540 1700 350
             sleep 1
             echo "== (b) MAPA COMPLETO: ALEJAR AL MAXIMO Y EMPUJAR AL NORTE ==" >> shots/checks.txt
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
             adb shell input swipe 540 1700 540 800 350
             adb shell input swipe 540 1700 540 800 350
             adb shell input swipe 540 1700 540 800 350
@@ -163,6 +168,7 @@ jobs:
             adb shell input keyevent 4
             sleep 3
             echo "== BUSCAR Y NAVEGAR: d entre 21 y 23 ==" >> shots/checks.txt
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
             adb shell input swipe 540 1700 540 800 350
             adb shell input swipe 540 1700 540 800 350
             sleep 1
@@ -194,13 +200,13 @@ jobs:
             python3 tap.py text "Terminar"
             sleep 3
             echo "== (e) REGRESION 0.3.1: CASO 0 M EN LA TIENDA ==" >> shots/checks.txt
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
             adb emu geo fix -82.39116 23.13474
             adb shell am force-stop "${{ inputs.paquete }}"
             sleep 3
             adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
             sleep 15
-            python3 tap.py text "Wait"
-            sleep 2
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
             adb shell input swipe 540 1700 540 800 350
             adb shell input swipe 540 1700 540 800 350
             sleep 1
