@@ -94,8 +94,9 @@ jobs:
             sleep 6
             python3 tap.py shot shots/03-busqueda.png
             adb shell input keyevent 4
-            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || true
             sleep 2
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || true
+            sleep 3
             python3 tap.py has "Calle D entre 21 y 23" >> shots/checks.txt
             echo "== MAPA DEL RESULTADO (PIN PROPIO) ==" >> shots/checks.txt
             python3 tap.py text "Mapa"
