@@ -90,7 +90,8 @@ jobs:
             sleep 6
             python3 tap.py shot shots/03-busqueda.png
             adb shell input keyevent 4
-            sleep 1
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || true
+            sleep 2
             python3 tap.py has "Calle D entre 21 y 23" >> shots/checks.txt
             echo "== MAPA DEL RESULTADO (PIN PROPIO) ==" >> shots/checks.txt
             python3 tap.py text "Mapa"
@@ -155,6 +156,8 @@ jobs:
             python3 tap.py shot shots/12-de-vuelta.png
             python3 tap.py has "Mis entregas de hoy" >> shots/checks.txt
             echo "== NAVEGACION DESDE LA ENTREGA ==" >> shots/checks.txt
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || true
+            sleep 3
             adb shell input swipe 540 800 540 1700 350
             adb shell input swipe 540 800 540 1700 350
             sleep 1
