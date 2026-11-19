@@ -178,7 +178,7 @@ jobs:
             sleep 2
             echo "== ENTREGA ==" >> shots/checks.txt
             adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || true
-            sleep 3
+            sleep 5
             adb shell input swipe 540 800 540 1700 350
             adb shell input swipe 540 800 540 1700 350
             adb shell input swipe 540 800 540 1700 350
@@ -190,9 +190,6 @@ jobs:
             python3 tap.py switch
             sleep 2
             python3 tap.py shot shots/09b-repartiendo.png
-            adb shell input swipe 540 1700 540 800 350
-            adb shell input swipe 540 1700 540 800 350
-            sleep 1
             python3 tap.py text "Salí"
             sleep 10
             python3 tap.py shot shots/10-sali.png
