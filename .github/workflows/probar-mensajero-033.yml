@@ -96,10 +96,15 @@ jobs:
             sleep 1
             python3 tap.py type "mensajero.prueba@neocharge.cu"
             sleep 1
+            adb shell input keyevent 4
+            sleep 2
             python3 tap.py edit 1
             sleep 1
             python3 tap.py type "NeoPrueba-f89168-26"
             sleep 1
+            adb shell input keyevent 4
+            sleep 2
+            python3 tap.py shot shots/03b-login-llenado.png
             for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
             python3 tap.py text "Entrar"
             sleep 5
@@ -156,12 +161,7 @@ jobs:
             python3 pinch.py 6 >> shots/checks.txt 2>&1 || echo "PINCH_FALLO" >> shots/checks.txt
             sleep 3
             python3 tap.py shot shots/08-mapa-zoomout.png
-            adb shell input swipe 540 500 540 1900 400
-            adb shell input swipe 540 500 540 1900 400
-            adb shell input swipe 540 500 540 1900 400
-            adb shell input swipe 540 500 540 1900 400
-            adb shell input swipe 540 500 540 1900 400
-            adb shell input swipe 540 500 540 1900 400
+            for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do adb shell input swipe 540 500 540 1900 300; done
             sleep 2
             python3 tap.py shot shots/09-mapa-norte.png
             python3 tap.py has "Mapa de La Habana" >> shots/checks.txt
@@ -176,11 +176,11 @@ jobs:
             sleep 1
             python3 tap.py type "d entre 21 y 23"
             sleep 1
+            adb shell input keyevent 4
+            sleep 2
             python3 tap.py text "Buscar"
             sleep 6
             python3 tap.py shot shots/10-busqueda.png
-            adb shell input keyevent 4
-            sleep 2
             python3 tap.py has "Calle D entre 21 y 23" >> shots/checks.txt
             python3 tap.py text "Ir"
             sleep 12
