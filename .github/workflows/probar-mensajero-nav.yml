@@ -158,10 +158,10 @@ jobs:
             python3 tap.py text "Cerrar"
             sleep 3
             python3 tap.py shot shots/11-de-vuelta.png
-            python3 tap.py has "Mis entregas de hoy" >> shots/checks.txt
+            python3 tap.py has "Buscar dirección" >> shots/checks.txt
             echo "== NAVEGACION DESDE LA ENTREGA (DESTINO A ~700 M: AQUI SI HAY FASE DE SEGUIR) ==" >> shots/checks.txt
             adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || true
-            sleep 3
+            sleep 5
             adb shell input swipe 540 800 540 1700 350
             adb shell input swipe 540 800 540 1700 350
             sleep 1
@@ -169,9 +169,6 @@ jobs:
             sleep 5
             python3 tap.py switch
             sleep 2
-            adb shell input swipe 540 1700 540 800 350
-            adb shell input swipe 540 1700 540 800 350
-            sleep 1
             python3 tap.py text "Salí"
             sleep 10
             python3 tap.py shot shots/12-sali.png
