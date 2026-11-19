@@ -58,13 +58,15 @@ jobs:
             adb shell pm grant "${{ inputs.paquete }}" android.permission.POST_NOTIFICATIONS || true
             adb emu geo fix -82.39116 23.13474
             adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
-            sleep 20
+            sleep 45
             python3 tap.py text "Wait"
             sleep 3
             python3 tap.py text "Wait"
-            sleep 2
+            sleep 3
             python3 tap.py text "Wait"
-            sleep 2
+            sleep 3
+            python3 tap.py text "Wait"
+            sleep 3
             python3 tap.py shot shots/01-login.png
             echo "== PANTALLA DE ENTRADA ==" >> shots/checks.txt
             python3 tap.py has "MapaNC" >> shots/checks.txt
