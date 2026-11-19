@@ -1,0 +1,162 @@
+name: Probar Mensajero ZOOM en emulador
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "URL publica del APK a probar"
+        required: true
+      paquete:
+        description: "Package de la app"
+        required: true
+        default: "com.neocharge.mensajero"
+      actividad:
+        description: "Actividad principal"
+        required: true
+        default: ".MainActivity"
+
+jobs:
+  emulador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Activar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          ls -la /dev/kvm || echo "SIN /dev/kvm"
+
+      - name: Traer tap.py del repo
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            tap.py
+          sparse-checkout-cone-mode: false
+
+      - name: Bajar el APK
+        run: |
+          curl -L -o app.apk "${{ inputs.apk_url }}"
+          ls -la app.apk
+
+      - name: Correr la app en el emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
+          disable-animations: true
+          script: |
+            mkdir -p shots
+            echo "== INSTALAR ==" > shots/checks.txt
+            adb install -r app.apk 2>&1 | tee shots/instalacion.txt
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.ACCESS_FINE_LOCATION || true
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.ACCESS_COARSE_LOCATION || true
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.POST_NOTIFICATIONS || true
+            adb emu geo fix -82.39116 23.13474
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 45
+            for i in 1 2 3 4 5 6; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 3; done
+            python3 tap.py shot shots/01-login.png
+            echo "== LOGIN ==" >> shots/checks.txt
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "mensajero.prueba@neocharge.cu"
+            sleep 1
+            python3 tap.py edit 1
+            sleep 1
+            python3 tap.py type "NeoPrueba-f89168-26"
+            sleep 1
+            for i in 1 2 3; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 3; done
+            python3 tap.py text "Entrar"
+            sleep 5
+            python3 tap.py text "Wait"
+            sleep 2
+            python3 tap.py text "Entrar"
+            sleep 15
+            python3 tap.py shot shots/02-dentro.png
+            echo "== TRAS LOGIN ==" >> shots/checks.txt
+            python3 tap.py has "Mis entregas de hoy" >> shots/checks.txt
+            echo "== (a) MAPA PRINCIPAL RECIEN ABIERTO (GPS EN LA TIENDA) ==" >> shots/checks.txt
+            adb shell input swipe 540 1700 540 800 350
+            adb shell input swipe 540 1700 540 800 350
+            adb shell input swipe 540 1700 540 800 350
+            sleep 1
+            python3 tap.py text "Ver el mapa de La Habana"
+            sleep 12
+            python3 tap.py shot shots/03-mapa-principal.png
+            python3 tap.py has "Mapa de La Habana" >> shots/checks.txt
+            adb shell input keyevent 4
+            sleep 3
+            echo "== REINICIO PA QUEDAR ARRIBA (SESION GUARDADA) ==" >> shots/checks.txt
+            adb shell am force-stop "${{ inputs.paquete }}"
+            sleep 3
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 15
+            python3 tap.py text "Wait"
+            sleep 2
+            python3 tap.py has "Mis entregas de hoy" >> shots/checks.txt
+            echo "== (b) PREVIA DE NAVEGACION A ~1 KM: l entre 21 y 23 ==" >> shots/checks.txt
+            adb shell input swipe 540 1700 540 800 350
+            adb shell input swipe 540 1700 540 800 350
+            sleep 1
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "l entre 21 y 23"
+            sleep 1
+            python3 tap.py text "Buscar"
+            sleep 6
+            python3 tap.py shot shots/04-busqueda-l.png
+            adb shell input keyevent 4
+            sleep 2
+            python3 tap.py has "Calle L entre 21 y 23" >> shots/checks.txt
+            python3 tap.py text "Ir"
+            sleep 12
+            python3 tap.py shot shots/05-previa-1km.png
+            python3 tap.py has "Navegación" >> shots/checks.txt
+            python3 tap.py has "Distancia:" >> shots/checks.txt
+            python3 tap.py has "Iniciar" >> shots/checks.txt
+            python3 tap.py has "Llegas" >> shots/checks.txt
+            echo "== (d) MODO SEGUIR INICIADO ==" >> shots/checks.txt
+            python3 tap.py text "Iniciar"
+            sleep 8
+            python3 tap.py shot shots/06-siguiendo.png
+            python3 tap.py has "Faltan" >> shots/checks.txt
+            python3 tap.py has "km/h" >> shots/checks.txt
+            python3 tap.py has "Vas por" >> shots/checks.txt
+            python3 tap.py has "Terminar" >> shots/checks.txt
+            python3 tap.py text "Terminar"
+            sleep 3
+            echo "== (c) CASO 0 M: DESTINO LA TIENDA ESTANDO EN LA TIENDA ==" >> shots/checks.txt
+            adb emu geo fix -82.39116 23.13474
+            adb shell am force-stop "${{ inputs.paquete }}"
+            sleep 3
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 15
+            python3 tap.py text "Wait"
+            sleep 2
+            adb shell input swipe 540 1700 540 800 350
+            adb shell input swipe 540 1700 540 800 350
+            sleep 1
+            python3 tap.py text "Tienda"
+            sleep 12
+            python3 tap.py shot shots/07-previa-0m.png
+            python3 tap.py has "Navegación" >> shots/checks.txt
+            python3 tap.py has "Tienda NeoCharge" >> shots/checks.txt
+            python3 tap.py has "Distancia: 0 m" >> shots/checks.txt
+            python3 tap.py text "Cerrar"
+            sleep 2
+            python3 tap.py shot shots/08-final.png
+            adb logcat -d > shots/logcat.txt || true
+            grep -c "FATAL EXCEPTION" shots/logcat.txt > shots/fatales.txt || echo "0" > shots/fatales.txt
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
+
+      - name: Subir resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-mensajero-zoom
+          path: shots/
+          if-no-files-found: warn
