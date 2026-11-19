@@ -1,4 +1,4 @@
-name: Probar APK Mensajero (MapaNC)
+name: Probar Mensajero en emulador
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ on:
 jobs:
   emulador:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 55
     steps:
       - name: Activar KVM
         run: |
@@ -27,12 +27,18 @@ jobs:
           sudo udevadm trigger --name-match=kvm || true
           ls -la /dev/kvm || echo "SIN /dev/kvm"
 
+      - name: Traer tap.py del repo
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            tap.py
+          sparse-checkout-cone-mode: false
+
       - name: Bajar el APK
         run: |
           curl -L -o app.apk "${{ inputs.apk_url }}"
           ls -la app.apk
-          AAPT=$(ls $ANDROID_HOME/build-tools/*/aapt | sort | tail -1)
-          $AAPT dump badging app.apk | grep -E "package:|application-label:|sdkVersion" | tee badging.txt
+          /usr/local/lib/android/sdk/build-tools/*/aapt dump badging app.apk 2>/dev/null | head -3 || ls /usr/local/lib/android/sdk/build-tools/ || true
 
       - name: Correr la app en el emulador
         uses: reactivecircus/android-emulator-runner@v2
@@ -45,28 +51,190 @@ jobs:
           disable-animations: true
           script: |
             mkdir -p shots
-            cp badging.txt shots/ || true
+            echo "== INSTALAR ==" > shots/checks.txt
             adb install -r app.apk 2>&1 | tee shots/instalacion.txt
-            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1
-            sleep 20
-            adb exec-out screencap -p > shots/01-login.png || true
-            adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
-            adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
-            adb pull /sdcard/ui.xml shots/ui-login.xml > /dev/null 2>&1 || true
-            python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; eds=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'class=.android.widget.EditText.[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml)]; eds=sorted(eds,key=lambda p:p[1]); t=eds[0] if eds else None; print('campo correo ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None; subprocess.run(['adb','shell','input','text','mensajero.prueba@neocharge.cu']) if t else None" || true
-            sleep 2
-            python3 -c "import re,subprocess,os; subprocess.run(['adb','shell','uiautomator','dump','/sdcard/ui.xml'],capture_output=True); subprocess.run(['adb','pull','/sdcard/ui.xml','shots/ui.xml'],capture_output=True); xml=open('shots/ui.xml',encoding='utf-8').read() if os.path.exists('shots/ui.xml') else ''; eds=[((int(a)+int(c))//2,(int(b)+int(d))//2) for a,b,c,d in re.findall(r'class=.android.widget.EditText.[^>]*bounds=.\[(\d+),(\d+)\]\[(\d+),(\d+)\].', xml)]; eds=sorted(eds,key=lambda p:p[1]); t=eds[1] if len(eds)>1 else None; print('campo contrasena ->',t,flush=True); subprocess.run(['adb','shell','input','tap',str(t[0]),str(t[1])]) if t else None; subprocess.run(['adb','shell','input','text','ClavePrueba123']) if t else None" || true
-            sleep 3
-            adb exec-out screencap -p > shots/02-escribiendo.png || true
-            adb shell pidof "${{ inputs.paquete }}" > shots/pid2.txt || echo "SIN_PROCESO" > shots/pid2.txt
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.ACCESS_FINE_LOCATION || true
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.ACCESS_COARSE_LOCATION || true
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.POST_NOTIFICATIONS || true
+            adb emu geo fix -82.39116 23.13474
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 18
+            python3 tap.py shot shots/01-login.png
+            echo "== PANTALLA DE ENTRADA ==" >> shots/checks.txt
+            python3 tap.py has "MapaNC" >> shots/checks.txt
+            python3 tap.py has "Entrar con Google" >> shots/checks.txt
+            python3 tap.py has "NeoCharge Mensajero" >> shots/checks.txt
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "mensajero.prueba@neocharge.cu"
+            sleep 1
+            python3 tap.py edit 1
+            sleep 1
+            python3 tap.py type "NeoPrueba-f89168-26"
+            sleep 1
+            python3 tap.py text "Entrar"
             sleep 15
-            adb exec-out screencap -p > shots/03-tras-escribir.png || true
-            adb shell pidof "${{ inputs.paquete }}" > shots/pid3.txt || echo "SIN_PROCESO" > shots/pid3.txt
-            adb shell dumpsys window windows | grep -E "mCurrentFocus|mFocusedApp" > shots/foco.txt || true
-            adb shell dumpsys activity activities | grep -A2 "topResumedActivity" | head -5 > shots/actividad-top.txt || true
+            python3 tap.py shot shots/02-dentro.png
+            echo "== TRAS LOGIN ==" >> shots/checks.txt
+            python3 tap.py has "Mis entregas de hoy" >> shots/checks.txt
+            python3 tap.py has "PRUEBA QA" >> shots/checks.txt
+            adb shell am force-stop "${{ inputs.paquete }}"
+            sleep 3
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 15
+            python3 tap.py shot shots/03-reapertura.png
+            echo "== REAPERTURA (SESION GUARDADA) ==" >> shots/checks.txt
+            python3 tap.py has "Mis entregas de hoy" >> shots/checks.txt
+            python3 tap.py has "Entra con tu cuenta" >> shots/checks.txt
+            echo "== BUSQUEDA 1: d entre 21 y 23 ==" >> shots/checks.txt
+            adb shell input swipe 540 1700 540 800 350
+            adb shell input swipe 540 1700 540 800 350
+            sleep 1
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "d entre 21 y 23"
+            sleep 1
+            python3 tap.py text "Buscar"
+            sleep 6
+            python3 tap.py shot shots/04-busqueda-d.png
+            python3 tap.py has "callejero de La Habana" >> shots/checks.txt
+            python3 tap.py has "Calle D entre 21 y 23" >> shots/checks.txt
+            python3 tap.py has "No encontré esa dirección" >> shots/checks.txt
+            python3 tap.py text "Mapa"
+            sleep 8
+            python3 tap.py shot shots/05-busqueda-mapa.png
+            python3 tap.py text "Cerrar"
+            sleep 2
+            adb shell am force-stop "${{ inputs.paquete }}"
+            sleep 3
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 12
+            echo "== BUSQUEDA 2: 23 entre D y E ==" >> shots/checks.txt
+            adb shell input swipe 540 1700 540 800 350
+            adb shell input swipe 540 1700 540 800 350
+            sleep 1
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "23 entre D y E"
+            sleep 1
+            python3 tap.py text "Buscar"
+            sleep 6
+            python3 tap.py shot shots/06-busqueda-23.png
+            python3 tap.py has "Calle 23 entre D y E" >> shots/checks.txt
+            python3 tap.py has "No encontré esa dirección" >> shots/checks.txt
+            adb shell am force-stop "${{ inputs.paquete }}"
+            sleep 3
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 12
+            echo "== BUSQUEDA 3: enlace pegado ==" >> shots/checks.txt
+            adb shell input swipe 540 1700 540 800 350
+            adb shell input swipe 540 1700 540 800 350
+            sleep 1
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "https://maps.google.com/?q=23.13550,-82.39250"
+            sleep 1
+            python3 tap.py text "Buscar"
+            sleep 6
+            python3 tap.py shot shots/07-busqueda-enlace.png
+            python3 tap.py has "Ver en el mapa" >> shots/checks.txt
+            python3 tap.py has "No encontré esa dirección" >> shots/checks.txt
+            echo "== MAPA COMPLETO ==" >> shots/checks.txt
+            adb shell input swipe 540 1700 540 800 350
+            adb shell input swipe 540 1700 540 800 350
+            adb shell input swipe 540 1700 540 800 350
+            sleep 1
+            python3 tap.py text "Ver el mapa de La Habana"
+            sleep 12
+            python3 tap.py shot shots/08-mapa.png
+            python3 tap.py has "Mapa de La Habana" >> shots/checks.txt
+            python3 tap.py text "Cerrar"
+            sleep 2
+            echo "== ENTREGA ==" >> shots/checks.txt
+            adb shell input swipe 540 800 540 1700 350
+            adb shell input swipe 540 800 540 1700 350
+            adb shell input swipe 540 800 540 1700 350
+            adb shell input swipe 540 800 540 1700 350
+            sleep 1
+            python3 tap.py desc "Actualizar"
+            sleep 5
+            python3 tap.py shot shots/09-pedidos.png
+            python3 tap.py switch
+            sleep 2
+            python3 tap.py shot shots/09b-repartiendo.png
+            python3 tap.py text "Salí"
+            sleep 10
+            python3 tap.py shot shots/10-sali.png
+            python3 tap.py has "En camino" >> shots/checks.txt
+            echo "== SIN INTERNET (COLA) ==" >> shots/checks.txt
+            adb shell cmd connectivity airplane-mode enable || true
+            sleep 3
+            adb emu geo fix -82.39350 23.13680
+            sleep 22
+            python3 tap.py shot shots/11-offline.png
+            python3 tap.py has "pings en cola" >> shots/checks.txt
+            adb shell cmd connectivity airplane-mode disable || true
+            sleep 25
+            python3 tap.py shot shots/11b-online.png
+            python3 tap.py has "pings en cola" >> shots/checks.txt
+            echo "== CERCA ==" >> shots/checks.txt
+            adb emu geo fix -82.39550 23.13850
+            sleep 25
+            python3 tap.py desc "Actualizar"
+            sleep 4
+            python3 tap.py shot shots/12-cerca.png
+            python3 tap.py has "Estás cerca" >> shots/checks.txt
+            echo "== FOTO (MEJOR ESFUERZO) ==" >> shots/checks.txt
+            python3 tap.py textpart "Foto de entrega"
+            sleep 6
+            python3 tap.py shot shots/13-camara.png
+            python3 tap.py desc "Take photo"
+            sleep 3
+            python3 tap.py desc "Done"
+            sleep 2
+            python3 tap.py text "Done"
+            sleep 3
+            python3 tap.py shot shots/13b-foto.png
+            adb shell input keyevent 4
+            sleep 2
+            echo "== ENTREGAR ==" >> shots/checks.txt
+            python3 tap.py textpart "Marcar entregado"
+            sleep 10
+            python3 tap.py shot shots/14-entregado.png
+            python3 tap.py has "entregas hechas hoy" >> shots/checks.txt
+            python3 tap.py has "En camino" >> shots/checks.txt
+            echo "== CERRAR EL DIA ==" >> shots/checks.txt
+            adb shell input swipe 540 1700 540 800 350
+            adb shell input swipe 540 1700 540 800 350
+            sleep 1
+            python3 tap.py text "Cerrar el día"
+            sleep 6
+            python3 tap.py shot shots/15-cierre.png
+            python3 tap.py has "Día cerrado" >> shots/checks.txt
+            echo "== SALIR Y REENTRAR ==" >> shots/checks.txt
+            adb shell input swipe 540 1700 540 800 350
+            adb shell input swipe 540 1700 540 800 350
+            adb shell input swipe 540 1700 540 800 350
+            sleep 1
+            python3 tap.py text "Salir de la cuenta"
+            sleep 5
+            python3 tap.py shot shots/16-login2.png
+            python3 tap.py has "Entra con tu cuenta" >> shots/checks.txt
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "mensajero.prueba@neocharge.cu"
+            sleep 1
+            python3 tap.py edit 1
+            sleep 1
+            python3 tap.py type "NeoPrueba-f89168-26"
+            sleep 1
+            python3 tap.py text "Entrar"
+            sleep 15
+            python3 tap.py shot shots/17-relogin.png
+            python3 tap.py has "Mis entregas de hoy" >> shots/checks.txt
             adb logcat -d > shots/logcat.txt || true
             grep -c "FATAL EXCEPTION" shots/logcat.txt > shots/fatales.txt || echo "0" > shots/fatales.txt
-            grep -c "AbstractResolvableFuture" shots/logcat.txt > shots/resolvable.txt || echo "0" > shots/resolvable.txt
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
 
       - name: Subir resultados
         if: always()
