@@ -1,0 +1,89 @@
+name: Repro sesion Mensajero 0.2.1
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "URL publica del APK a probar"
+        required: true
+      paquete:
+        description: "Package de la app"
+        required: true
+        default: "com.neocharge.mensajero"
+      actividad:
+        description: "Actividad principal"
+        required: true
+        default: ".MainActivity"
+
+jobs:
+  emulador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Activar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          ls -la /dev/kvm || echo "SIN /dev/kvm"
+
+      - name: Traer tap.py del repo
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            tap.py
+          sparse-checkout-cone-mode: false
+
+      - name: Bajar el APK
+        run: |
+          curl -L -o app.apk "${{ inputs.apk_url }}"
+          ls -la app.apk
+
+      - name: Correr la app en el emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
+          disable-animations: true
+          script: |
+            mkdir -p shots
+            adb install -r app.apk 2>&1 | tee shots/instalacion.txt
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 18
+            python3 tap.py shot shots/01-login.png
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "mensajero.prueba@neocharge.cu"
+            sleep 1
+            python3 tap.py edit 1
+            sleep 1
+            python3 tap.py type "NeoPrueba-f89168-26"
+            sleep 1
+            python3 tap.py text "Entrar"
+            sleep 15
+            python3 tap.py shot shots/02-dentro.png
+            python3 tap.py has "Mis entregas de hoy" > shots/tras-login.txt
+            python3 tap.py has "NeoCharge Mensajero" >> shots/tras-login.txt
+            adb shell am force-stop "${{ inputs.paquete }}"
+            sleep 3
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 15
+            python3 tap.py shot shots/03-reapertura.png
+            python3 tap.py has "Mis entregas de hoy" > shots/reapertura.txt
+            python3 tap.py has "NeoCharge Mensajero" >> shots/reapertura.txt
+            python3 tap.py has "Entra con tu cuenta" >> shots/reapertura.txt
+            adb shell run-as "${{ inputs.paquete }}" ls files/datastore/ > shots/datastore-ls.txt 2>&1 || adb shell ls /data/data/"${{ inputs.paquete }}"/files/datastore/ > shots/datastore-ls.txt 2>&1 || echo "sin acceso" > shots/datastore-ls.txt
+            adb logcat -d > shots/logcat.txt || true
+            grep -c "FATAL EXCEPTION" shots/logcat.txt > shots/fatales.txt || echo "0" > shots/fatales.txt
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
+
+      - name: Subir resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-repro
+          path: shots/
+          if-no-files-found: warn
