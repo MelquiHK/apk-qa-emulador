@@ -1,0 +1,173 @@
+name: Probar Mensajero - solo entrega
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "URL publica del APK a probar"
+        required: true
+      paquete:
+        description: "Package de la app"
+        required: true
+        default: "com.neocharge.mensajero"
+      actividad:
+        description: "Actividad principal"
+        required: true
+        default: ".MainActivity"
+
+jobs:
+  emulador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Activar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          ls -la /dev/kvm || echo "SIN /dev/kvm"
+
+      - name: Traer tap.py del repo
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            tap.py
+          sparse-checkout-cone-mode: false
+
+      - name: Bajar el APK
+        run: |
+          curl -L -o app.apk "${{ inputs.apk_url }}"
+          ls -la app.apk
+
+      - name: Correr la entrega en el emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
+          disable-animations: true
+          script: |
+            mkdir -p shots
+            echo "== ENTREGA SOLA ==" > shots/checks.txt
+            adb install -r app.apk 2>&1 | tee shots/instalacion.txt
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.ACCESS_FINE_LOCATION || true
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.ACCESS_COARSE_LOCATION || true
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.POST_NOTIFICATIONS || true
+            adb emu geo fix -82.39116 23.13474
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 20
+            python3 tap.py text "Wait"
+            sleep 3
+            adb shell cmd statusbar collapse || true
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "mensajero.prueba@neocharge.cu"
+            sleep 1
+            python3 tap.py edit 1
+            sleep 1
+            python3 tap.py type "NeoPrueba-f89168-26"
+            sleep 1
+            adb shell input keyevent 4
+            sleep 1
+            python3 tap.py text "Entrar"
+            sleep 15
+            adb shell cmd statusbar collapse || true
+            python3 tap.py shot shots/e01-dentro.png
+            python3 tap.py has "PRUEBA QA" >> shots/checks.txt
+            python3 tap.py switch
+            sleep 2
+            adb shell cmd statusbar collapse || true
+            python3 tap.py shot shots/e02-repartiendo.png
+            python3 tap.py has "En turno" >> shots/checks.txt
+            python3 tap.py text "Salí"
+            sleep 10
+            adb shell cmd statusbar collapse || true
+            python3 tap.py shot shots/e03-sali.png
+            python3 tap.py has "En camino" >> shots/checks.txt
+            echo "== SIN INTERNET (COLA) ==" >> shots/checks.txt
+            adb shell cmd connectivity airplane-mode enable || true
+            sleep 3
+            adb emu geo fix -82.39350 23.13680
+            sleep 22
+            adb shell cmd statusbar collapse || true
+            python3 tap.py shot shots/e04-offline.png
+            python3 tap.py has "pings en cola" >> shots/checks.txt
+            adb shell cmd connectivity airplane-mode disable || true
+            sleep 25
+            python3 tap.py shot shots/e05-online.png
+            python3 tap.py has "pings en cola" >> shots/checks.txt
+            echo "== CERCA ==" >> shots/checks.txt
+            adb emu geo fix -82.39550 23.13850
+            sleep 25
+            adb shell cmd statusbar collapse || true
+            python3 tap.py desc "Actualizar"
+            sleep 4
+            python3 tap.py shot shots/e06-cerca.png
+            python3 tap.py has "Estás cerca" >> shots/checks.txt
+            echo "== FOTO (MEJOR ESFUERZO) ==" >> shots/checks.txt
+            python3 tap.py textpart "Foto de entrega"
+            sleep 6
+            python3 tap.py shot shots/e07-camara.png
+            python3 tap.py desc "Take photo"
+            sleep 3
+            python3 tap.py desc "Done"
+            sleep 2
+            python3 tap.py text "Done"
+            sleep 3
+            python3 tap.py shot shots/e07b-foto.png
+            adb shell input keyevent 4
+            sleep 2
+            adb shell cmd statusbar collapse || true
+            echo "== ENTREGAR ==" >> shots/checks.txt
+            python3 tap.py textpart "Marcar entregado"
+            sleep 10
+            python3 tap.py shot shots/e08-entregado.png
+            python3 tap.py has "entregas hechas" >> shots/checks.txt
+            python3 tap.py has "En camino" >> shots/checks.txt
+            echo "== CERRAR EL DIA ==" >> shots/checks.txt
+            adb shell input swipe 540 1700 540 800 350
+            adb shell input swipe 540 1700 540 800 350
+            sleep 1
+            adb shell cmd statusbar collapse || true
+            python3 tap.py text "Cerrar el día"
+            sleep 6
+            python3 tap.py shot shots/e09-cierre.png
+            python3 tap.py has "Día cerrado" >> shots/checks.txt
+            echo "== SALIR Y REENTRAR ==" >> shots/checks.txt
+            adb shell input swipe 540 1700 540 800 350
+            adb shell input swipe 540 1700 540 800 350
+            adb shell input swipe 540 1700 540 800 350
+            sleep 1
+            adb shell cmd statusbar collapse || true
+            python3 tap.py text "Salir de la cuenta"
+            sleep 5
+            python3 tap.py shot shots/e10-login2.png
+            python3 tap.py has "Entra con tu cuenta" >> shots/checks.txt
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "mensajero.prueba@neocharge.cu"
+            sleep 1
+            python3 tap.py edit 1
+            sleep 1
+            python3 tap.py type "NeoPrueba-f89168-26"
+            sleep 1
+            adb shell input keyevent 4
+            sleep 1
+            python3 tap.py text "Entrar"
+            sleep 15
+            adb shell cmd statusbar collapse || true
+            python3 tap.py shot shots/e11-relogin.png
+            python3 tap.py has "Mis entregas de hoy" >> shots/checks.txt
+            adb logcat -d > shots/logcat.txt || true
+            grep -c "FATAL EXCEPTION" shots/logcat.txt > shots/fatales.txt || echo "0" > shots/fatales.txt
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
+
+      - name: Subir resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-entrega
+          path: shots/
+          if-no-files-found: warn
