@@ -62,6 +62,8 @@ jobs:
             sleep 3
             python3 tap.py text "Wait"
             sleep 2
+            python3 tap.py text "Wait"
+            sleep 2
             python3 tap.py shot shots/01-login.png
             echo "== LOGIN ==" >> shots/checks.txt
             python3 tap.py edit 0
@@ -72,6 +74,8 @@ jobs:
             sleep 1
             python3 tap.py type "NeoPrueba-f89168-26"
             sleep 1
+            python3 tap.py text "Wait"
+            sleep 2
             python3 tap.py text "Entrar"
             sleep 15
             python3 tap.py shot shots/02-dentro.png
