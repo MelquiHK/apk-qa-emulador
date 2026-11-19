@@ -103,6 +103,8 @@ jobs:
             python3 tap.py text "Buscar"
             sleep 6
             python3 tap.py shot shots/04-busqueda-d.png
+            adb shell input keyevent 4
+            sleep 1
             python3 tap.py has "callejero de La Habana" >> shots/checks.txt
             python3 tap.py has "Calle D entre 21 y 23" >> shots/checks.txt
             python3 tap.py has "No encontré esa dirección" >> shots/checks.txt
@@ -128,6 +130,8 @@ jobs:
             python3 tap.py text "Buscar"
             sleep 6
             python3 tap.py shot shots/06-busqueda-23.png
+            adb shell input keyevent 4
+            sleep 1
             python3 tap.py has "Calle 23 entre D y E" >> shots/checks.txt
             python3 tap.py has "No encontré esa dirección" >> shots/checks.txt
             adb shell am force-stop "${{ inputs.paquete }}"
@@ -147,6 +151,8 @@ jobs:
             python3 tap.py text "Buscar"
             sleep 6
             python3 tap.py shot shots/07-busqueda-enlace.png
+            adb shell input keyevent 4
+            sleep 1
             python3 tap.py has "Ver en el mapa" >> shots/checks.txt
             python3 tap.py has "No encontré esa dirección" >> shots/checks.txt
             echo "== MAPA COMPLETO ==" >> shots/checks.txt
@@ -160,6 +166,8 @@ jobs:
             python3 tap.py has "Mapa de La Habana" >> shots/checks.txt
             python3 tap.py text "Cerrar"
             sleep 2
+            adb shell input keyevent 4
+            sleep 1
             echo "== ENTREGA ==" >> shots/checks.txt
             adb shell input swipe 540 800 540 1700 350
             adb shell input swipe 540 800 540 1700 350
