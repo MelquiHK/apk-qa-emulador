@@ -39,8 +39,9 @@ def nodes(xml):
             "text": (re.search(r'text="([^"]*)"', n) or [None, ""])[1],
             "desc": (re.search(r'content-desc="([^"]*)"', n) or [None, ""])[1],
             "cls": (re.search(r'class="([^"]*)"', n) or [None, ""])[1],
+            "checked": (re.search(r'checked="([^"]*)"', n) or [None, ""])[1],
             "cx": (a + c) // 2, "cy": (b + d) // 2,
-            "x2": c, "y1": b, "y2": d,
+            "x1": a, "x2": c, "y1": b, "y2": d,
         })
     return out
 
@@ -89,12 +90,17 @@ def main():
     elif mode == "switch":
         hits = [n for n in ns if n["cls"] == "android.widget.Switch"]
         if hits:
-            tap(hits[0]["cx"], hits[0]["cy"])
+            sw = hits[0]
+            if sw["checked"] == "true":
+                print("switch YA ENCENDIDO", flush=True)
+            else:
+                tap(sw["cx"], sw["cy"])
         else:
             rows = [n for n in ns if "repartiendo" in n["text"]]
             if rows:
                 r = rows[0]
-                tap(max(r["x2"] - 70, 0), r["cy"])
+                width = max((n["x2"] for n in ns), default=1080)
+                tap(int(width * 0.86), r["cy"])
             else:
                 print("NO_ENCONTRADO switch", flush=True)
     elif mode == "type":
