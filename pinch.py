@@ -2,15 +2,33 @@
 """Pinch-in (alejar el mapa) con uiautomator2 pa la QA.
 
 Uso: pinch.py [veces]
-En uiautomator2 v3 el Device ya no tiene pinch_in: se usa el
-gesto de dos dedos d.gesture(p1, p2, p3, p4). Si eso falla,
-se intenta el pinch sobre la vista del mapa (SurfaceView).
-Si todo falla, sale con error y el workflow lo anota.
+uiautomator2 v3 no tiene pinch_in ni gesture en el Device:
+se intenta el toque multipuntero d.touch.down/move/up con
+dos pointer_id. Si la API no existe o falla, sale con error
+y el workflow sigue (la prueba del tope de zoom la cubre el
+botón «−» de la navegación y la del borde, los swipes).
 """
 import sys
 import time
 
 import uiautomator2 as u2
+
+
+def pinch_una(d, w, h):
+    cx, cy = w // 2, h // 2
+    r_out = int(min(w, h) * 0.34)
+    r_in = int(min(w, h) * 0.07)
+    pasos = 10
+    d.touch.down(cx - r_out, cy, pointer_id=0)
+    d.touch.down(cx + r_out, cy, pointer_id=1)
+    time.sleep(0.1)
+    for i in range(1, pasos + 1):
+        r = r_out + (r_in - r_out) * i // pasos
+        d.touch.move(cx - r, cy, pointer_id=0)
+        d.touch.move(cx + r, cy, pointer_id=1)
+        time.sleep(0.03)
+    d.touch.up(pointer_id=0)
+    d.touch.up(pointer_id=1)
 
 
 def main():
@@ -19,23 +37,9 @@ def main():
     info = d.info
     w = int(info["displayWidth"])
     h = int(info["displayHeight"])
-    cx, cy = w // 2, h // 2
-    r_out = int(min(w, h) * 0.34)
-    r_in = int(min(w, h) * 0.07)
     for _ in range(veces):
-        try:
-            # Dedos alejados -> dedos juntos: aleja el mapa.
-            d.gesture(
-                (cx - r_out, cy), (cx + r_out, cy),
-                (cx - r_in, cy), (cx + r_in, cy),
-                steps=24,
-            )
-        except Exception:
-            vista = d(className="android.view.SurfaceView")
-            if not vista.exists:
-                vista = d(className="android.opengl.GLSurfaceView")
-            vista.pinch_in(percent=70, steps=15)
-        time.sleep(1.2)
+        pinch_una(d, w, h)
+        time.sleep(1.0)
     print("pinch ok x%d" % veces)
 
 
