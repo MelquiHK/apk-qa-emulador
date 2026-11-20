@@ -14,7 +14,7 @@ on:
       actividad:
         description: "Actividad principal"
         required: true
-        default: ".SplashActivity"
+        default: ".DownloadResourcesActivity"
 
 jobs:
   emulador:
@@ -48,9 +48,13 @@ jobs:
             mkdir -p shots
             cp badging.txt shots/ || true
             adb install -r app.apk 2>&1 | tee shots/instalacion.txt
-            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" || adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1
-            sleep 15
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.ACCESS_FINE_LOCATION || true
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.ACCESS_COARSE_LOCATION || true
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}" 2>&1 | tee shots/arranque.txt
+            sleep 12
             adb exec-out screencap -p > shots/01-arranque.png || true
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
+            if grep -q SIN_PROCESO shots/pid.txt; then echo "am start no levanto la app, probando monkey"; adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1; sleep 10; adb exec-out screencap -p > shots/01b-reintento-monkey.png || true; adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt; fi
             adb shell dumpsys window windows | grep -E "mCurrentFocus|mFocusedApp" > shots/foco.txt || true
             adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
             adb shell dumpsys activity activities | grep -A2 "topResumedActivity" | head -5 > shots/actividad-top.txt || true
