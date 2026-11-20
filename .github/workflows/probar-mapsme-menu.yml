@@ -1,0 +1,154 @@
+name: Explorar MAPS.ME menu y ajustes en emulador
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "URL publica del APK a probar"
+        required: true
+        default: "https://d.apkpure.net/b/APK/com.mapswithme.maps.pro?version=latest"
+      paquete:
+        description: "Package de la app"
+        required: true
+        default: "com.mapswithme.maps.pro"
+      actividad:
+        description: "Actividad principal (no se usa, se abre con monkey)"
+        required: true
+        default: ".DownloadResourcesActivity"
+
+jobs:
+  emulador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Activar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          ls -la /dev/kvm || echo "SIN /dev/kvm"
+
+      - name: Traer tap.py del repo
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            tap.py
+          sparse-checkout-cone-mode: false
+
+      - name: Bajar el APK
+        run: |
+          curl -L -o app.apk "${{ inputs.apk_url }}"
+          ls -la app.apk
+          AAPT=$(ls $ANDROID_HOME/build-tools/*/aapt | sort | tail -1)
+          $AAPT dump badging app.apk | grep -E "package:|sdkVersion" | tee badging.txt
+
+      - name: Explorar el menu de MAPS.ME en el emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
+          disable-animations: true
+          script: |
+            mkdir -p shots
+            cp badging.txt shots/ || true
+            adb install -r app.apk 2>&1 | tee shots/instalacion.txt
+            for p in android.permission.POST_NOTIFICATIONS android.permission.ACCESS_FINE_LOCATION android.permission.ACCESS_COARSE_LOCATION android.permission.READ_EXTERNAL_STORAGE android.permission.WRITE_EXTERNAL_STORAGE android.permission.RECORD_AUDIO; do adb shell pm grant "${{ inputs.paquete }}" $p 2>/dev/null; done; echo permisos-ok
+            adb emu geo fix -82.3666 23.1136 || true
+            adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1
+            sleep 18
+            python3 tap.py text "Wait"
+            sleep 2
+            python3 tap.py text "Allow"
+            sleep 2
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
+            python3 tap.py text "Next"
+            sleep 3
+            python3 tap.py text "Next"
+            sleep 3
+            python3 tap.py text "Next"
+            sleep 3
+            python3 tap.py text "Get Started"
+            sleep 2
+            adb shell input tap 540 2192
+            sleep 8
+            python3 tap.py text "Wait"
+            sleep 1
+            for i in 1 2 3 4 5 6; do python3 tap.py has "Download" | grep -q "SI " && break; sleep 5; done
+            sleep 8
+            python3 tap.py text "CANCEL"
+            sleep 3
+            python3 tap.py shot shots/01-mapa.png
+            echo "== MENU ==" > shots/checks.txt
+            adb shell input tap 990 2274
+            sleep 4
+            python3 tap.py shot shots/02-menu.png
+            python3 tap.py dump shots/ui-menu.xml
+            python3 tap.py texts shots/menu-textos.txt
+            python3 tap.py clickables shots/botones-menu.txt
+            echo "== AJUSTES ==" >> shots/checks.txt
+            python3 tap.py text "Settings"
+            sleep 4
+            python3 tap.py shot shots/03-ajustes.png
+            python3 tap.py dump shots/ui-ajustes.xml
+            python3 tap.py texts shots/ajustes-textos.txt
+            adb shell input swipe 540 1700 540 900 400
+            sleep 2
+            python3 tap.py shot shots/04-ajustes-2.png
+            python3 tap.py dump shots/ui-ajustes2.xml
+            python3 tap.py texts shots/ajustes-textos-2.txt
+            adb shell input swipe 540 1700 540 900 400
+            sleep 2
+            python3 tap.py shot shots/05-ajustes-3.png
+            python3 tap.py dump shots/ui-ajustes3.xml
+            python3 tap.py texts shots/ajustes-textos-3.txt
+            adb shell input keyevent 4
+            sleep 3
+            python3 tap.py text "Wait"
+            python3 tap.py shot shots/06-tras-ajustes.png
+            echo "== DESCARGAS ==" >> shots/checks.txt
+            adb shell input tap 990 2274
+            sleep 3
+            python3 tap.py shot shots/07-menu-2.png
+            python3 tap.py text "Download maps"
+            sleep 5
+            python3 tap.py shot shots/08-descargas.png
+            python3 tap.py dump shots/ui-descargas.xml
+            python3 tap.py texts shots/descargas-textos.txt
+            python3 tap.py clickables shots/botones-descargas.txt
+            adb shell input keyevent 4
+            sleep 3
+            python3 tap.py text "Wait"
+            python3 tap.py shot shots/09-tras-descargas.png
+            echo "== GUARDADOS ==" >> shots/checks.txt
+            adb shell input tap 754 2274
+            sleep 4
+            python3 tap.py shot shots/10-guardados.png
+            python3 tap.py dump shots/ui-guardados.xml
+            python3 tap.py texts shots/guardados-textos.txt
+            python3 tap.py clickables shots/botones-guardados.txt
+            adb shell input keyevent 4
+            sleep 3
+            python3 tap.py text "Wait"
+            echo "== BILLETERA ==" >> shots/checks.txt
+            adb shell input tap 529 2274
+            sleep 4
+            python3 tap.py shot shots/11-billetera.png
+            python3 tap.py dump shots/ui-billetera.xml
+            python3 tap.py texts shots/billetera-textos.txt
+            adb shell input keyevent 4
+            sleep 3
+            python3 tap.py text "Wait"
+            python3 tap.py shot shots/12-final.png
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid-final.txt || echo "SIN_PROCESO" > shots/pid-final.txt
+            adb logcat -d > shots/logcat.txt || true
+
+      - name: Subir resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-emulador
+          path: shots/
+          if-no-files-found: warn
