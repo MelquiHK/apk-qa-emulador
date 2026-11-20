@@ -1,0 +1,217 @@
+name: Explorar MAPS.ME a fondo 3 en emulador
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "URL publica del APK a probar"
+        required: true
+        default: "https://d.apkpure.net/b/APK/com.mapswithme.maps.pro?version=latest"
+      paquete:
+        description: "Package de la app"
+        required: true
+        default: "com.mapswithme.maps.pro"
+      actividad:
+        description: "Actividad principal (no se usa, se abre con monkey)"
+        required: true
+        default: ".DownloadResourcesActivity"
+
+jobs:
+  emulador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Activar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          ls -la /dev/kvm || echo "SIN /dev/kvm"
+
+      - name: Traer tap.py del repo
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            tap.py
+          sparse-checkout-cone-mode: false
+
+      - name: Bajar el APK
+        run: |
+          curl -L -o app.apk "${{ inputs.apk_url }}"
+          ls -la app.apk
+          AAPT=$(ls $ANDROID_HOME/build-tools/*/aapt | sort | tail -1)
+          $AAPT dump badging app.apk | grep -E "package:|sdkVersion" | tee badging.txt
+
+      - name: Explorar MAPS.ME en el emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
+          disable-animations: true
+          script: |
+            mkdir -p shots
+            cp badging.txt shots/ || true
+            adb install -r app.apk 2>&1 | tee shots/instalacion.txt
+            for p in android.permission.POST_NOTIFICATIONS android.permission.ACCESS_FINE_LOCATION android.permission.ACCESS_COARSE_LOCATION android.permission.READ_EXTERNAL_STORAGE android.permission.WRITE_EXTERNAL_STORAGE android.permission.RECORD_AUDIO; do adb shell pm grant "${{ inputs.paquete }}" $p 2>/dev/null; done; echo permisos-ok
+            adb emu geo fix -82.3666 23.1136 || true
+            adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1
+            sleep 18
+            python3 tap.py shot shots/01-splash.png
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
+            python3 tap.py text "Allow"
+            sleep 2
+            python3 tap.py text "Next"
+            sleep 3
+            python3 tap.py text "Next"
+            sleep 3
+            python3 tap.py text "Next"
+            sleep 3
+            python3 tap.py shot shots/02-onboarding-fin.png
+            python3 tap.py text "Get Started"
+            sleep 2
+            adb shell input tap 540 2192
+            sleep 8
+            python3 tap.py shot shots/03-mapa-mundo.png
+            echo "== TARJETA CUBA: REINTENTO Y CIERRE DEL DIALOGO ==" > shots/checks.txt
+            adb shell input tap 539 1271
+            sleep 8
+            python3 tap.py shot shots/04-retry.png
+            adb shell input tap 679 1365
+            sleep 3
+            python3 tap.py text "CANCEL"
+            sleep 2
+            python3 tap.py shot shots/05-tras-cancel.png
+            python3 tap.py dump shots/ui-05.xml
+            python3 tap.py texts shots/textos-05.txt
+            echo "== CAPAS (COORDENADAS) ==" >> shots/checks.txt
+            adb shell input tap 89 217
+            sleep 4
+            python3 tap.py shot shots/06-capas.png
+            python3 tap.py dump shots/ui-capas.xml
+            python3 tap.py texts shots/textos-capas.txt
+            python3 tap.py clickables shots/botones-capas.txt
+            adb shell input tap 89 217
+            sleep 2
+            echo "== ZOOM Y MI POSICION ==" >> shots/checks.txt
+            adb shell input tap 991 766
+            adb shell input tap 991 766
+            sleep 3
+            python3 tap.py shot shots/07-zoom.png
+            adb shell input tap 991 1891
+            sleep 5
+            python3 tap.py shot shots/08-mi-posicion.png
+            echo "== BUSCAR (COORDENADAS) ==" >> shots/checks.txt
+            adb shell input tap 79 2274
+            sleep 4
+            python3 tap.py shot shots/09-buscar.png
+            python3 tap.py dump shots/ui-buscar.xml
+            python3 tap.py texts shots/textos-buscar.txt
+            python3 tap.py clickables shots/botones-buscar.txt
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "Habana"
+            sleep 4
+            python3 tap.py shot shots/10-buscar-habana.png
+            python3 tap.py dump shots/ui-buscar-habana.xml
+            python3 tap.py texts shots/textos-buscar-habana.txt
+            python3 tap.py result "Habana"
+            python3 tap.py result "Havana"
+            sleep 6
+            python3 tap.py shot shots/11-lugar.png
+            python3 tap.py dump shots/ui-lugar.xml
+            python3 tap.py texts shots/textos-lugar.txt
+            python3 tap.py clickables shots/botones-lugar.txt
+            python3 tap.py text "Route"
+            sleep 6
+            python3 tap.py shot shots/12-ruta.png
+            python3 tap.py dump shots/ui-ruta.xml
+            python3 tap.py texts shots/textos-ruta.txt
+            python3 tap.py clickables shots/botones-ruta.txt
+            adb shell input keyevent 4
+            sleep 2
+            adb shell input keyevent 4
+            sleep 2
+            if ! adb shell dumpsys activity activities | grep topResumedActivity | grep -q mapswithme; then adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1; sleep 6; fi
+            echo "== PANEL DE RUTA DIRECTO ==" >> shots/checks.txt
+            adb shell input tap 304 2274
+            sleep 5
+            python3 tap.py shot shots/13-panel-ruta.png
+            python3 tap.py dump shots/ui-panel-ruta.xml
+            python3 tap.py texts shots/textos-panel-ruta.txt
+            python3 tap.py clickables shots/botones-panel-ruta.txt
+            adb shell input keyevent 4
+            sleep 2
+            if ! adb shell dumpsys activity activities | grep topResumedActivity | grep -q mapswithme; then adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1; sleep 6; fi
+            echo "== MENU (COORDENADAS) Y AJUSTES ==" >> shots/checks.txt
+            adb shell input tap 990 2274
+            sleep 4
+            python3 tap.py shot shots/14-menu.png
+            python3 tap.py dump shots/ui-menu.xml
+            python3 tap.py texts shots/menu-textos.txt
+            python3 tap.py clickables shots/botones-menu.txt
+            python3 tap.py text "Settings"
+            sleep 4
+            python3 tap.py shot shots/15-ajustes.png
+            python3 tap.py dump shots/ui-ajustes.xml
+            python3 tap.py texts shots/ajustes-textos.txt
+            adb shell input swipe 540 1700 540 900 400
+            sleep 2
+            python3 tap.py shot shots/16-ajustes-2.png
+            python3 tap.py dump shots/ui-ajustes2.xml
+            python3 tap.py texts shots/ajustes-textos-2.txt
+            adb shell input swipe 540 1700 540 900 400
+            sleep 2
+            python3 tap.py shot shots/17-ajustes-3.png
+            python3 tap.py dump shots/ui-ajustes3.xml
+            python3 tap.py texts shots/ajustes-textos-3.txt
+            adb shell input keyevent 4
+            sleep 2
+            adb shell input keyevent 4
+            sleep 2
+            if ! adb shell dumpsys activity activities | grep topResumedActivity | grep -q mapswithme; then adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1; sleep 6; fi
+            echo "== DESCARGAS DESDE EL MENU ==" >> shots/checks.txt
+            adb shell input tap 990 2274
+            sleep 3
+            python3 tap.py text "Download maps"
+            sleep 5
+            python3 tap.py shot shots/18-descargas.png
+            python3 tap.py dump shots/ui-descargas.xml
+            python3 tap.py texts shots/descargas-textos.txt
+            python3 tap.py clickables shots/botones-descargas.txt
+            adb shell input keyevent 4
+            sleep 2
+            adb shell input keyevent 4
+            sleep 2
+            if ! adb shell dumpsys activity activities | grep topResumedActivity | grep -q mapswithme; then adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1; sleep 6; fi
+            echo "== GUARDADOS (ESTRELLA) ==" >> shots/checks.txt
+            adb shell input tap 754 2274
+            sleep 4
+            python3 tap.py shot shots/19-guardados.png
+            python3 tap.py dump shots/ui-guardados.xml
+            python3 tap.py texts shots/guardados-textos.txt
+            adb shell input keyevent 4
+            sleep 2
+            if ! adb shell dumpsys activity activities | grep topResumedActivity | grep -q mapswithme; then adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1; sleep 6; fi
+            echo "== BILLETERA (ICONO DEL CENTRO) ==" >> shots/checks.txt
+            adb shell input tap 529 2274
+            sleep 4
+            python3 tap.py shot shots/20-billetera.png
+            python3 tap.py dump shots/ui-billetera.xml
+            python3 tap.py texts shots/billetera-textos.txt
+            adb shell input keyevent 4
+            sleep 2
+            if ! adb shell dumpsys activity activities | grep topResumedActivity | grep -q mapswithme; then adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1; sleep 6; fi
+            python3 tap.py shot shots/21-final.png
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid-final.txt || echo "SIN_PROCESO" > shots/pid-final.txt
+            adb logcat -d > shots/logcat.txt || true
+
+      - name: Subir resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-emulador
+          path: shots/
+          if-no-files-found: warn
