@@ -5,6 +5,11 @@ Uso:
   tap.py text "Entrar" [idx]     toca el nodo con ese texto exacto
   tap.py textpart "Entregas"     toca el nodo cuyo texto CONTIENE eso
   tap.py desc "Actualizar"       toca por content-desc
+  tap.py descpart "Menu"         toca el nodo cuyo content-desc CONTIENE eso
+  tap.py result "Habana"         toca el 1er nodo con ese texto por debajo de y=500
+  tap.py dump ui.xml             guarda el dump actual en el archivo dado
+  tap.py texts lista.txt         escribe textos y descs visibles en el archivo
+  tap.py clickables lista.txt    escribe nodos tocables (texto|desc|bounds)
   tap.py edit IDX                toca el EditText nº IDX (orden visual)
   tap.py switch                  toca el Switch (o estima su posición)
   tap.py type "texto con espacios"
@@ -79,6 +84,42 @@ def main():
             tap(hits[0]["cx"], hits[0]["cy"])
         else:
             print("NO_ENCONTRADO desc=" + want, flush=True)
+    elif mode == "descpart":
+        want = sys.argv[2]
+        hits = [n for n in ns if want in n["desc"]]
+        hits.sort(key=lambda n: n["cy"])
+        if hits:
+            tap(hits[0]["cx"], hits[0]["cy"])
+        else:
+            print("NO_ENCONTRADO descpart=" + want, flush=True)
+    elif mode == "result":
+        want = sys.argv[2]
+        hits = [n for n in ns if want in n["text"] and n["cy"] > 500]
+        hits.sort(key=lambda n: n["cy"])
+        if hits:
+            tap(hits[0]["cx"], hits[0]["cy"])
+        else:
+            print("NO_ENCONTRADO result=" + want, flush=True)
+    elif mode == "dump":
+        with open(sys.argv[2], "w", encoding="utf-8") as f:
+            f.write(xml)
+        print("dump " + sys.argv[2], flush=True)
+    elif mode == "texts":
+        vals = sorted({n["text"] for n in ns if n["text"]} |
+                      {n["desc"] for n in ns if n["desc"]})
+        with open(sys.argv[2], "w", encoding="utf-8") as f:
+            f.write("\n".join(vals))
+        print("texts %d en %s" % (len(vals), sys.argv[2]), flush=True)
+    elif mode == "clickables":
+        rows = []
+        for n in ns:
+            if 'clickable="true"' in n["raw"]:
+                rows.append("texto=%s | desc=%s | bounds=[%d,%d][%d,%d]" %
+                            (n["text"], n["desc"], n["x1"], n["y1"],
+                             n["x2"], n["y2"]))
+        with open(sys.argv[2], "w", encoding="utf-8") as f:
+            f.write("\n".join(rows))
+        print("clickables %d en %s" % (len(rows), sys.argv[2]), flush=True)
     elif mode == "edit":
         idx = int(sys.argv[2])
         hits = [n for n in ns if n["cls"] == "android.widget.EditText"]
