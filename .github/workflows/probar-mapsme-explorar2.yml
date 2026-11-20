@@ -1,0 +1,267 @@
+name: Explorar MAPS.ME a fondo 2 en emulador
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "URL publica del APK a probar"
+        required: true
+        default: "https://d.apkpure.net/b/APK/com.mapswithme.maps.pro?version=latest"
+      paquete:
+        description: "Package de la app"
+        required: true
+        default: "com.mapswithme.maps.pro"
+      actividad:
+        description: "Actividad principal (no se usa, se abre con monkey)"
+        required: true
+        default: ".DownloadResourcesActivity"
+
+jobs:
+  emulador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Activar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          ls -la /dev/kvm || echo "SIN /dev/kvm"
+
+      - name: Traer tap.py del repo
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            tap.py
+          sparse-checkout-cone-mode: false
+
+      - name: Bajar el APK
+        run: |
+          curl -L -o app.apk "${{ inputs.apk_url }}"
+          ls -la app.apk
+          AAPT=$(ls $ANDROID_HOME/build-tools/*/aapt | sort | tail -1)
+          $AAPT dump badging app.apk | grep -E "package:|sdkVersion" | tee badging.txt
+
+      - name: Explorar MAPS.ME en el emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
+          disable-animations: true
+          script: |
+            mkdir -p shots
+            cp badging.txt shots/ || true
+            echo "== INSTALAR Y ABRIR ==" > shots/checks.txt
+            adb install -r app.apk 2>&1 | tee shots/instalacion.txt
+            for p in android.permission.POST_NOTIFICATIONS android.permission.ACCESS_FINE_LOCATION android.permission.ACCESS_COARSE_LOCATION android.permission.READ_EXTERNAL_STORAGE android.permission.WRITE_EXTERNAL_STORAGE android.permission.RECORD_AUDIO; do adb shell pm grant "${{ inputs.paquete }}" $p 2>/dev/null; done; echo permisos-ok
+            adb emu geo fix -82.3666 23.1136 || true
+            adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1
+            sleep 18
+            python3 tap.py shot shots/01-splash.png
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
+            python3 tap.py text "Allow"
+            sleep 2
+            echo "== ONBOARDING ==" >> shots/checks.txt
+            python3 tap.py text "Next"
+            sleep 3
+            python3 tap.py shot shots/02-onboarding-p2.png
+            python3 tap.py text "Next"
+            sleep 3
+            python3 tap.py shot shots/03-onboarding-p3.png
+            python3 tap.py text "Next"
+            sleep 3
+            python3 tap.py shot shots/04-onboarding-p4.png
+            python3 tap.py text "Get Started"
+            sleep 2
+            python3 tap.py has "Get Started" >> shots/checks.txt
+            adb shell input tap 540 2192
+            sleep 6
+            python3 tap.py has "Get Started" >> shots/checks.txt
+            python3 tap.py shot shots/05-tras-getstarted.png
+            python3 tap.py dump shots/ui-05.xml
+            python3 tap.py texts shots/textos-05.txt
+            echo "== SUGERENCIA DE DESCARGA ==" >> shots/checks.txt
+            for i in 1 2 3 4 5 6; do python3 tap.py has "Download" | grep -q "SI " && break; sleep 5; done
+            python3 tap.py shot shots/06-sugerencia.png
+            python3 tap.py dump shots/ui-06.xml
+            python3 tap.py texts shots/textos-06.txt
+            python3 tap.py text "Download"
+            python3 tap.py descpart "Download"
+            sleep 20
+            python3 tap.py shot shots/07-descargando.png
+            sleep 30
+            python3 tap.py shot shots/08-descarga-fin.png
+            python3 tap.py dump shots/ui-08.xml
+            python3 tap.py texts shots/textos-08.txt
+            python3 tap.py text "Close"
+            python3 tap.py text "Done"
+            python3 tap.py descpart "Close"
+            python3 tap.py descpart "Navigate up"
+            sleep 5
+            if ! adb shell dumpsys activity activities | grep topResumedActivity | grep -q mapswithme; then adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1; sleep 6; fi
+            echo "== MAPA PRINCIPAL ==" >> shots/checks.txt
+            python3 tap.py shot shots/09-principal.png
+            python3 tap.py dump shots/ui-principal.xml
+            python3 tap.py clickables shots/botones-principal.txt
+            python3 tap.py texts shots/textos-principal.txt
+            python3 tap.py descpart "Layers"
+            sleep 3
+            python3 tap.py shot shots/10-capas.png
+            python3 tap.py dump shots/ui-capas.xml
+            python3 tap.py texts shots/textos-capas.txt
+            python3 tap.py descpart "Layers"
+            sleep 2
+            python3 tap.py descpart "Zoom in"
+            python3 tap.py descpart "Zoom in"
+            sleep 3
+            python3 tap.py shot shots/11-zoom.png
+            python3 tap.py descpart "ocation"
+            sleep 5
+            python3 tap.py shot shots/12-mi-ubicacion.png
+            python3 tap.py descpart "Discover"
+            sleep 4
+            python3 tap.py shot shots/13-descubrir.png
+            adb shell input keyevent 4
+            sleep 2
+            if ! adb shell dumpsys activity activities | grep topResumedActivity | grep -q mapswithme; then adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1; sleep 6; fi
+            echo "== BUSCAR HABANA, LUGAR Y RUTA ==" >> shots/checks.txt
+            python3 tap.py descpart "Search"
+            sleep 4
+            python3 tap.py shot shots/14-buscar.png
+            python3 tap.py dump shots/ui-buscar.xml
+            python3 tap.py texts shots/textos-buscar.txt
+            python3 tap.py clickables shots/botones-buscar.txt
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "Habana"
+            sleep 4
+            python3 tap.py shot shots/15-buscar-habana.png
+            python3 tap.py dump shots/ui-buscar-habana.xml
+            python3 tap.py texts shots/textos-buscar-habana.txt
+            python3 tap.py result "Habana"
+            python3 tap.py result "Havana"
+            sleep 6
+            python3 tap.py shot shots/16-lugar.png
+            python3 tap.py dump shots/ui-lugar.xml
+            python3 tap.py texts shots/textos-lugar.txt
+            python3 tap.py clickables shots/botones-lugar.txt
+            python3 tap.py text "Route"
+            python3 tap.py descpart "Route"
+            sleep 7
+            python3 tap.py shot shots/17-ruta-panel.png
+            python3 tap.py dump shots/ui-ruta.xml
+            python3 tap.py texts shots/textos-ruta.txt
+            python3 tap.py clickables shots/botones-ruta.txt
+            python3 tap.py descpart "Walk"
+            sleep 5
+            python3 tap.py shot shots/18-ruta-a-pie.png
+            python3 tap.py descpart "Car"
+            sleep 5
+            python3 tap.py text "Start"
+            sleep 7
+            python3 tap.py shot shots/19-navegacion-1.png
+            python3 tap.py dump shots/ui-nav.xml
+            python3 tap.py texts shots/textos-nav.txt
+            sleep 15
+            python3 tap.py shot shots/20-navegacion-2.png
+            python3 tap.py descpart "Close"
+            python3 tap.py text "Stop"
+            sleep 2
+            adb shell input keyevent 4
+            sleep 2
+            adb shell input keyevent 4
+            sleep 3
+            if ! adb shell dumpsys activity activities | grep topResumedActivity | grep -q mapswithme; then adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1; sleep 6; fi
+            python3 tap.py shot shots/21-tras-navegacion.png
+            echo "== TOQUE LARGO EN EL MAPA Y GUARDAR ==" >> shots/checks.txt
+            adb shell input swipe 540 1100 540 1100 900
+            sleep 4
+            python3 tap.py shot shots/22-lugar-mapa.png
+            python3 tap.py dump shots/ui-lugar2.xml
+            python3 tap.py texts shots/textos-lugar2.txt
+            python3 tap.py text "Bookmark"
+            python3 tap.py text "Save"
+            python3 tap.py descpart "Bookmark"
+            sleep 3
+            python3 tap.py shot shots/23-guardar-lugar.png
+            python3 tap.py text "Save"
+            python3 tap.py text "Done"
+            sleep 2
+            adb shell input keyevent 4
+            sleep 2
+            if ! adb shell dumpsys activity activities | grep topResumedActivity | grep -q mapswithme; then adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1; sleep 6; fi
+            echo "== MENU Y AJUSTES ==" >> shots/checks.txt
+            python3 tap.py descpart "Menu"
+            sleep 4
+            python3 tap.py shot shots/24-menu.png
+            python3 tap.py dump shots/ui-menu.xml
+            python3 tap.py texts shots/menu-textos.txt
+            python3 tap.py clickables shots/botones-menu.txt
+            python3 tap.py text "Settings"
+            sleep 4
+            python3 tap.py shot shots/25-ajustes.png
+            python3 tap.py dump shots/ui-ajustes.xml
+            python3 tap.py texts shots/ajustes-textos.txt
+            adb shell input swipe 540 1700 540 900 400
+            sleep 2
+            python3 tap.py shot shots/26-ajustes-2.png
+            python3 tap.py dump shots/ui-ajustes2.xml
+            python3 tap.py texts shots/ajustes-textos-2.txt
+            adb shell input swipe 540 1700 540 900 400
+            sleep 2
+            python3 tap.py shot shots/27-ajustes-3.png
+            adb shell input keyevent 4
+            sleep 2
+            adb shell input keyevent 4
+            sleep 2
+            if ! adb shell dumpsys activity activities | grep topResumedActivity | grep -q mapswithme; then adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1; sleep 6; fi
+            echo "== DESCARGAS Y CUBA ==" >> shots/checks.txt
+            python3 tap.py descpart "Menu"
+            sleep 3
+            python3 tap.py text "Download maps"
+            sleep 5
+            python3 tap.py shot shots/28-descargas.png
+            python3 tap.py dump shots/ui-descargas.xml
+            python3 tap.py texts shots/descargas-textos.txt
+            python3 tap.py descpart "Search"
+            sleep 2
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "Cuba"
+            sleep 4
+            python3 tap.py shot shots/29-buscar-cuba.png
+            python3 tap.py dump shots/ui-buscar-cuba.xml
+            python3 tap.py texts shots/textos-buscar-cuba.txt
+            python3 tap.py descpart "Download"
+            sleep 30
+            python3 tap.py shot shots/30-cuba-descargando.png
+            adb shell input keyevent 4
+            sleep 2
+            adb shell input keyevent 4
+            sleep 2
+            adb shell input keyevent 4
+            sleep 2
+            if ! adb shell dumpsys activity activities | grep topResumedActivity | grep -q mapswithme; then adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1; sleep 6; fi
+            echo "== GUARDADOS ==" >> shots/checks.txt
+            python3 tap.py descpart "Bookmark"
+            sleep 4
+            python3 tap.py shot shots/31-guardados.png
+            python3 tap.py dump shots/ui-guardados.xml
+            python3 tap.py texts shots/guardados-textos.txt
+            adb shell input keyevent 4
+            sleep 2
+            if ! adb shell dumpsys activity activities | grep topResumedActivity | grep -q mapswithme; then adb shell monkey -p "${{ inputs.paquete }}" -c android.intent.category.LAUNCHER 1; sleep 6; fi
+            python3 tap.py shot shots/32-principal-final.png
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid-final.txt || echo "SIN_PROCESO" > shots/pid-final.txt
+            adb logcat -d > shots/logcat.txt || true
+
+      - name: Subir resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-emulador
+          path: shots/
+          if-no-files-found: warn
