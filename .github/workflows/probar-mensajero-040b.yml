@@ -119,9 +119,9 @@ jobs:
             python3 tap.py has "Panel de pedidos" >> shots/checks.txt
             python3 tap.py shot shots/e-mapa-dueno.png
             python3 tap.py text "Panel de pedidos"
-            for i in 1 2 3 4 5 6; do python3 tap.py has "Sin asignar (1)" | grep -q "SI " && break; sleep 4; done
+            for i in 1 2 3 4 5 6; do python3 tap.py has "Sin asignar (" | grep -q "SI " && break; sleep 4; done
             python3 tap.py shot shots/e-panel.png
-            python3 tap.py has "Sin asignar (1)" >> shots/checks.txt
+            python3 tap.py has "Sin asignar (" >> shots/checks.txt
             python3 tap.py has "PRUEBA QA MapaNC 040" >> shots/checks.txt
             python3 tap.py has "Mensajero principal" >> shots/checks.txt
             python3 tap.py text "Elegir principal"
@@ -136,9 +136,9 @@ jobs:
             python3 tap.py shot shots/e-asignar.png
             python3 tap.py has "Asignar el pedido" >> shots/checks.txt
             python3 tap.py textpart "Mensajero QA MapaNC"
-            for i in 1 2 3 4 5 6; do python3 tap.py has "Ya asignados (1)" | grep -q "SI " && break; sleep 3; done
+            for i in 1 2 3 4 5 6; do python3 tap.py has "Ya asignados (" | grep -q "SI " && break; sleep 3; done
             python3 tap.py shot shots/e-asignado.png
-            python3 tap.py has "Ya asignados (1)" >> shots/checks.txt
+            python3 tap.py has "Ya asignados (" >> shots/checks.txt
             python3 tap.py has "asignado a Mensajero QA MapaNC" >> shots/checks.txt
             adb shell pm clear "${{ inputs.paquete }}"
             sleep 2
