@@ -1,0 +1,294 @@
+name: Probar Mensajero 0.4.0 en emulador (mapa directo, porton y bucle)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "URL publica del APK a probar"
+        required: true
+      paquete:
+        description: "Package de la app"
+        required: true
+        default: "com.neocharge.mensajero"
+      actividad:
+        description: "Actividad principal"
+        required: true
+        default: ".MainActivity"
+
+jobs:
+  emulador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Activar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          ls -la /dev/kvm || echo "SIN /dev/kvm"
+
+      - name: Traer tap.py y pinch.py del repo
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            tap.py
+            pinch.py
+          sparse-checkout-cone-mode: false
+
+      - name: Bajar el APK
+        run: |
+          curl -L -o app.apk "${{ inputs.apk_url }}"
+          ls -la app.apk
+
+      - name: Correr la app en el emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
+          disable-animations: true
+          script: |
+            mkdir -p shots
+            echo "== INSTALAR ==" > shots/checks.txt
+            adb install -r app.apk 2>&1 | tee shots/instalacion.txt
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.ACCESS_FINE_LOCATION || true
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.ACCESS_COARSE_LOCATION || true
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.POST_NOTIFICATIONS || true
+            adb emu geo fix -82.39116 23.13474
+            adb shell am force-stop com.google.android.apps.nexuslauncher || true
+            sleep 3
+            echo "== (a) MAPA DIRECTO SIN CUENTA: 1080x2400 densidad 420 ==" >> shots/checks.txt
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 50
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
+            python3 tap.py shot shots/a-mapa-med.png
+            python3 tap.py has "Buscar en Cuba" >> shots/checks.txt
+            python3 tap.py has "Dónde comer" >> shots/checks.txt
+            python3 tap.py has "Entrar con Google" >> shots/checks.txt
+            python3 tap.py has "Mis entregas" >> shots/checks.txt
+            echo "== (a) MAPA DIRECTO: 1220x2712 densidad 446 (POCO de Mel) ==" >> shots/checks.txt
+            adb shell wm size 1220x2712
+            adb shell wm density 446
+            sleep 2
+            adb emu geo fix -82.39116 23.13474
+            adb shell am force-stop "${{ inputs.paquete }}"
+            sleep 3
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 35
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
+            python3 tap.py shot shots/a-mapa-poco.png
+            python3 tap.py has "Buscar en Cuba" >> shots/checks.txt
+            echo "== (a) MAPA DIRECTO: 720x1280 densidad 320 ==" >> shots/checks.txt
+            adb shell wm size 720x1280
+            adb shell wm density 320
+            sleep 2
+            adb emu geo fix -82.39116 23.13474
+            adb shell am force-stop "${{ inputs.paquete }}"
+            sleep 3
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 35
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
+            python3 tap.py shot shots/a-mapa-chico.png
+            python3 tap.py has "Buscar en Cuba" >> shots/checks.txt
+            adb shell wm size 1080x2400
+            adb shell wm density 420
+            sleep 2
+            adb emu geo fix -82.39116 23.13474
+            adb shell am force-stop "${{ inputs.paquete }}"
+            sleep 3
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 30
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
+            echo "== (b) BUSCADOR Y RUTA SIN CUENTA ==" >> shots/checks.txt
+            python3 tap.py textpart "Buscar en Cuba"
+            sleep 4
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "d entre 21 y 23"
+            sleep 1
+            adb shell input keyevent 4
+            sleep 2
+            python3 tap.py text "Buscar dirección"
+            sleep 7
+            python3 tap.py shot shots/b-busqueda.png
+            python3 tap.py has "Ir" >> shots/checks.txt
+            python3 tap.py text "Ir"
+            sleep 3
+            python3 tap.py shot shots/b-pin.png
+            python3 tap.py has "Ir a este punto" >> shots/checks.txt
+            python3 tap.py text "Ir a este punto"
+            sleep 18
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
+            python3 tap.py shot shots/b-previa.png
+            python3 tap.py has "Navegación" >> shots/checks.txt
+            python3 tap.py has "Distancia:" >> shots/checks.txt
+            python3 tap.py has "Iniciar" >> shots/checks.txt
+            python3 tap.py text "Iniciar"
+            sleep 9
+            python3 tap.py shot shots/b-siguiendo.png
+            python3 tap.py has "km/h" >> shots/checks.txt
+            python3 tap.py has "Buscando tu posición" >> shots/checks.txt
+            python3 tap.py text "Terminar"
+            sleep 2
+            python3 tap.py text "Cerrar"
+            sleep 2
+            echo "== (b) CATEGORIA FARMACIA SIN CUENTA ==" >> shots/checks.txt
+            python3 tap.py text "Farmacia"
+            sleep 16
+            python3 tap.py shot shots/b-farmacia.png
+            python3 tap.py has "Farmacia" >> shots/checks.txt
+            python3 tap.py has "cerca de ti" >> shots/checks.txt
+            python3 tap.py text "← Mapa"
+            sleep 2
+            echo "== (c) BOTON DE CUENTA, LOGIN Y GOOGLE ==" >> shots/checks.txt
+            python3 tap.py desc "Entrar"
+            sleep 3
+            python3 tap.py shot shots/c-cuenta.png
+            python3 tap.py has "Sin cuenta" >> shots/checks.txt
+            python3 tap.py text "Entrar con tu cuenta"
+            sleep 3
+            python3 tap.py shot shots/c-login.png
+            python3 tap.py has "Entrar con Google" >> shots/checks.txt
+            python3 tap.py has "Correo" >> shots/checks.txt
+            python3 tap.py text "Entrar con Google"
+            sleep 9
+            python3 tap.py shot shots/c-google.png
+            python3 tap.py has "Google" >> shots/checks.txt
+            adb shell input keyevent 4
+            sleep 2
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 3
+            python3 tap.py shot shots/c-tras-google.png
+            python3 tap.py has "Entrar con Google" >> shots/checks.txt
+            python3 tap.py has "Entrar con Google" | grep -q "SI " || python3 tap.py desc "Entrar"
+            sleep 2
+            python3 tap.py has "Entrar con tu cuenta" | grep -q "NO " || python3 tap.py text "Entrar con tu cuenta"
+            sleep 3
+            echo "== (d1) MENSAJERO DE PRUEBA ENTRA: SIN PEDIDOS TODAVIA ==" >> shots/checks.txt
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "mapanc.qa.mensajero@neocharge.cu"
+            sleep 1
+            adb shell input keyevent 4
+            sleep 1
+            python3 tap.py edit 1
+            sleep 1
+            python3 tap.py type "QaMapaNC-m-fb00ef3518"
+            sleep 1
+            adb shell input keyevent 4
+            sleep 2
+            python3 tap.py text "Entrar"
+            sleep 14
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
+            python3 tap.py shot shots/d-mapa-mensajero.png
+            python3 tap.py has "Mis entregas" >> shots/checks.txt
+            python3 tap.py text "Mis entregas"
+            sleep 8
+            python3 tap.py shot shots/d-entregas-vacias.png
+            python3 tap.py has "Mis entregas de hoy" >> shots/checks.txt
+            python3 tap.py has "No tienes entregas asignadas" >> shots/checks.txt
+            python3 tap.py text "← Mapa"
+            sleep 2
+            echo "== SESION GUARDADA: REINICIO Y SIGUE DENTRO ==" >> shots/checks.txt
+            adb shell am force-stop "${{ inputs.paquete }}"
+            sleep 3
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 18
+            python3 tap.py has "Mis entregas" >> shots/checks.txt
+            adb shell pm clear "${{ inputs.paquete }}"
+            sleep 2
+            adb emu geo fix -82.39116 23.13474
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 25
+            python3 tap.py has "Buscar en Cuba" >> shots/checks.txt
+            echo "== (e) DUENO DE PRUEBA: PORTON, PRINCIPAL Y ASIGNACION ==" >> shots/checks.txt
+            python3 tap.py desc "Entrar"
+            sleep 3
+            python3 tap.py text "Entrar con tu cuenta"
+            sleep 3
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "mapanc.qa.dueno@neocharge.cu"
+            sleep 1
+            adb shell input keyevent 4
+            sleep 1
+            python3 tap.py edit 1
+            sleep 1
+            python3 tap.py type "QaMapaNC-o-9fb3613cc2"
+            sleep 1
+            adb shell input keyevent 4
+            sleep 2
+            python3 tap.py text "Entrar"
+            sleep 14
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
+            python3 tap.py shot shots/e-mapa-dueno.png
+            python3 tap.py has "Panel de pedidos" >> shots/checks.txt
+            python3 tap.py text "Panel de pedidos"
+            sleep 9
+            python3 tap.py shot shots/e-panel.png
+            python3 tap.py has "Panel de pedidos" >> shots/checks.txt
+            python3 tap.py has "Sin asignar (1)" >> shots/checks.txt
+            python3 tap.py has "PRUEBA QA MapaNC 040" >> shots/checks.txt
+            python3 tap.py has "Mensajero principal" >> shots/checks.txt
+            python3 tap.py text "Elegir principal"
+            sleep 3
+            python3 tap.py shot shots/e-picker-principal.png
+            python3 tap.py textpart "Mensajero QA MapaNC"
+            sleep 6
+            python3 tap.py has "es ahora tu mensajero principal" >> shots/checks.txt
+            python3 tap.py shot shots/e-principal.png
+            python3 tap.py text "Asignar"
+            sleep 7
+            python3 tap.py shot shots/e-asignar.png
+            python3 tap.py has "Asignar el pedido" >> shots/checks.txt
+            python3 tap.py textpart "Mensajero QA MapaNC"
+            sleep 7
+            python3 tap.py shot shots/e-asignado.png
+            python3 tap.py has "Ya asignados (1)" >> shots/checks.txt
+            python3 tap.py has "asignado a Mensajero QA MapaNC" >> shots/checks.txt
+            python3 tap.py text "← Mapa"
+            sleep 2
+            echo "== (d2) EL MENSAJERO YA VE SU PEDIDO (BUCLE COMPLETO) ==" >> shots/checks.txt
+            adb shell pm clear "${{ inputs.paquete }}"
+            sleep 2
+            adb emu geo fix -82.39116 23.13474
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 25
+            python3 tap.py desc "Entrar"
+            sleep 3
+            python3 tap.py text "Entrar con tu cuenta"
+            sleep 3
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "mapanc.qa.mensajero@neocharge.cu"
+            sleep 1
+            adb shell input keyevent 4
+            sleep 1
+            python3 tap.py edit 1
+            sleep 1
+            python3 tap.py type "QaMapaNC-m-fb00ef3518"
+            sleep 1
+            adb shell input keyevent 4
+            sleep 2
+            python3 tap.py text "Entrar"
+            sleep 14
+            python3 tap.py has "Mis entregas" >> shots/checks.txt
+            python3 tap.py text "Mis entregas"
+            sleep 9
+            python3 tap.py shot shots/d-entregas-con-pedido.png
+            python3 tap.py has "Mis entregas de hoy" >> shots/checks.txt
+            python3 tap.py has "PRUEBA QA MapaNC 040" >> shots/checks.txt
+            adb logcat -d > shots/logcat.txt || true
+            grep "MapaNCFrame" shots/logcat.txt > shots/frame.txt || echo "SIN_LINEAS_FRAME" > shots/frame.txt
+            grep -c "FATAL EXCEPTION" shots/logcat.txt > shots/fatales.txt || echo "0" > shots/fatales.txt
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
+
+      - name: Subir resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-mensajero-040
+          path: shots/
+          if-no-files-found: warn
