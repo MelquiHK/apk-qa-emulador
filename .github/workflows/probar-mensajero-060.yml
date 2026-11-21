@@ -1,0 +1,235 @@
+name: Probar Mensajero 0.6.0 en emulador (arreglos de Mel)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "URL publica del APK a probar"
+        required: true
+      paquete:
+        description: "Package de la app"
+        required: true
+        default: "com.neocharge.mensajero"
+      actividad:
+        description: "Actividad principal"
+        required: true
+        default: ".MainActivity"
+
+jobs:
+  emulador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Activar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          ls -la /dev/kvm || echo "SIN /dev/kvm"
+
+      - name: Traer tap.py, pinch.py y rotate.py del repo
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            tap.py
+            pinch.py
+            rotate.py
+          sparse-checkout-cone-mode: false
+
+      - name: Instalar uiautomator2 (pa el giro y el pinch)
+        run: pip install uiautomator2 -q || echo "SIN uiautomator2"
+
+      - name: Bajar el APK
+        run: |
+          curl -L -o app.apk "${{ inputs.apk_url }}"
+          ls -la app.apk
+
+      - name: Correr la app en el emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
+          disable-animations: true
+          script: |
+            mkdir -p shots
+            echo "== INSTALAR ==" > shots/checks.txt
+            adb install -r app.apk 2>&1 | tee shots/instalacion.txt
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.ACCESS_FINE_LOCATION || true
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.ACCESS_COARSE_LOCATION || true
+            adb shell pm grant "${{ inputs.paquete }}" android.permission.POST_NOTIFICATIONS || true
+            adb emu geo fix -82.39116 23.13474
+            adb shell am force-stop com.google.android.apps.nexuslauncher || true
+            sleep 3
+            echo "== (a) MAPA 1080x2400 densidad 420 ==" >> shots/checks.txt
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 50
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
+            python3 tap.py shot shots/a-mapa-med.png
+            python3 tap.py has "Buscar en Cuba" >> shots/checks.txt
+            python3 tap.py has "Dónde comer" >> shots/checks.txt
+            python3 tap.py has "Mis entregas" >> shots/checks.txt
+            echo "== (a) MAPA 1220x2712 densidad 446 (POCO de Mel) ==" >> shots/checks.txt
+            adb shell wm size 1220x2712
+            adb shell wm density 446
+            sleep 2
+            adb emu geo fix -82.39116 23.13474
+            adb shell am force-stop "${{ inputs.paquete }}"
+            sleep 3
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 35
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
+            python3 tap.py shot shots/a-mapa-poco.png
+            python3 tap.py has "Buscar en Cuba" >> shots/checks.txt
+            echo "== (a) MAPA 720x1280 densidad 320 ==" >> shots/checks.txt
+            adb shell wm size 720x1280
+            adb shell wm density 320
+            sleep 2
+            adb emu geo fix -82.39116 23.13474
+            adb shell am force-stop "${{ inputs.paquete }}"
+            sleep 3
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 35
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
+            python3 tap.py shot shots/a-mapa-chico.png
+            python3 tap.py has "Buscar en Cuba" >> shots/checks.txt
+            adb shell wm size 1080x2400
+            adb shell wm density 420
+            sleep 2
+            adb emu geo fix -82.39116 23.13474
+            adb shell am force-stop "${{ inputs.paquete }}"
+            sleep 3
+            adb shell am start -n "${{ inputs.paquete }}/${{ inputs.actividad }}"
+            sleep 30
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
+            echo "== (b) TEMA OSCURO Y TARJETA DE LUGAR (Guardar/Compartir vivos) ==" >> shots/checks.txt
+            python3 tap.py desc "Menú"
+            sleep 3
+            python3 tap.py text "Ajustes"
+            sleep 3
+            python3 tap.py shot shots/b-ajustes.png
+            python3 tap.py has "Edificios en 3D" >> shots/checks.txt
+            python3 tap.py text "Oscuro"
+            sleep 2
+            python3 tap.py text "← Mapa"
+            sleep 4
+            python3 tap.py shot shots/b-mapa-oscuro.png
+            adb shell input swipe 540 1100 540 1100 900
+            sleep 3
+            python3 tap.py shot shots/b-tarjeta-oscuro.png
+            python3 tap.py has "Punto marcado en el mapa" >> shots/checks.txt
+            python3 tap.py has "Guardar" >> shots/checks.txt
+            python3 tap.py has "Compartir" >> shots/checks.txt
+            python3 tap.py desc "Cerrar"
+            sleep 1
+            echo "== (b) VOLVER A CLARO ==" >> shots/checks.txt
+            python3 tap.py desc "Menú"
+            sleep 2
+            python3 tap.py text "Ajustes"
+            sleep 2
+            python3 tap.py text "Claro"
+            sleep 2
+            python3 tap.py text "← Mapa"
+            sleep 3
+            echo "== (c) CATEGORIA FARMACIA EN EL BUSCADOR (resultados reales) ==" >> shots/checks.txt
+            python3 tap.py textpart "Buscar en Cuba"
+            sleep 3
+            python3 tap.py text "Farmacia"
+            sleep 45
+            python3 tap.py shot shots/c-farmacia.png
+            python3 tap.py has "Farmacia" >> shots/checks.txt
+            python3 tap.py has "Buscando" >> shots/checks.txt
+            python3 tap.py desc "Volver al mapa"
+            sleep 2
+            echo "== (d) PREVIA LARGA AL CERRO (encuadre sin recorte) ==" >> shots/checks.txt
+            python3 tap.py textpart "Buscar en Cuba"
+            sleep 3
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "23.11397, -82.37247"
+            sleep 2
+            adb shell input keyevent 4
+            sleep 1
+            python3 tap.py text "Buscar dirección"
+            sleep 8
+            python3 tap.py shot shots/d-coordenadas.png
+            python3 tap.py text "Ir"
+            sleep 3
+            python3 tap.py shot shots/d-tarjeta.png
+            python3 tap.py text "Ruta"
+            sleep 25
+            for i in 1 2 3 4 5 6 7 8; do python3 tap.py has "isn't responding" | grep -q "NO " && break; python3 tap.py text "Wait"; sleep 4; done
+            python3 tap.py shot shots/d-previa-cerro.png
+            python3 tap.py has "Navegación" >> shots/checks.txt
+            python3 tap.py has "Distancia:" >> shots/checks.txt
+            python3 tap.py has "Ruta 1" >> shots/checks.txt
+            echo "== (d) ALTERNATIVA DESDE LA LISTA ==" >> shots/checks.txt
+            python3 tap.py textpart "Ruta 2"
+            sleep 3
+            python3 tap.py shot shots/d-previa-ruta2.png
+            echo "== (d) RECORRIDO: BOTONES NUEVOS (Vista / Mi ubicacion) ==" >> shots/checks.txt
+            python3 tap.py text "Iniciar"
+            sleep 9
+            python3 tap.py shot shots/d-siguiendo.png
+            python3 tap.py has "km/h" >> shots/checks.txt
+            python3 tap.py has "Ir a mi ubicación" >> shots/checks.txt
+            python3 tap.py has "Vista: tu rumbo" >> shots/checks.txt
+            python3 tap.py desc "Vista: tu rumbo"
+            sleep 3
+            python3 tap.py shot shots/d-vista-norte.png
+            python3 tap.py has "Vista: norte arriba" >> shots/checks.txt
+            python3 tap.py desc "Ir a mi ubicación"
+            sleep 3
+            python3 tap.py shot shots/d-mi-ubicacion.png
+            python3 tap.py text "Terminar"
+            sleep 2
+            python3 tap.py text "Cerrar"
+            sleep 2
+            echo "== (e) A PIE: PASOS Y ATAJO DEL CALLEJON DE HAMEL ==" >> shots/checks.txt
+            python3 tap.py textpart "Buscar en Cuba"
+            sleep 3
+            python3 tap.py edit 0
+            sleep 1
+            python3 tap.py type "23.139100, -82.374800"
+            sleep 2
+            adb shell input keyevent 4
+            sleep 1
+            python3 tap.py text "Buscar dirección"
+            sleep 8
+            python3 tap.py text "Ir"
+            sleep 3
+            python3 tap.py text "Ruta"
+            sleep 20
+            python3 tap.py text "A pie"
+            sleep 20
+            python3 tap.py shot shots/e-previa-apie.png
+            python3 tap.py has "Distancia:" >> shots/checks.txt
+            python3 tap.py text "Ver pasos"
+            sleep 3
+            python3 tap.py shot shots/e-pasos-apie.png
+            python3 tap.py has "Callejón de Hamel" >> shots/checks.txt
+            python3 tap.py has "Pasos de la ruta" >> shots/checks.txt
+            adb shell input keyevent 4
+            sleep 1
+            python3 tap.py text "Cerrar"
+            sleep 2
+            echo "== (f) CAPAS: 3D ENCENDIDO POR DEFECTO ==" >> shots/checks.txt
+            python3 tap.py desc "Capas"
+            sleep 2
+            python3 tap.py shot shots/f-capas.png
+            python3 tap.py has "Edificios en 3D" >> shots/checks.txt
+            python3 tap.py desc "Cerrar capas"
+            sleep 1
+            adb logcat -d > shots/logcat.txt || true
+            grep -c "FATAL EXCEPTION" shots/logcat.txt > shots/fatales.txt || echo "0" > shots/fatales.txt
+            adb shell pidof "${{ inputs.paquete }}" > shots/pid.txt || echo "SIN_PROCESO" > shots/pid.txt
+
+      - name: Subir resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-mensajero-060
+          path: shots/
+          if-no-files-found: warn
