@@ -141,6 +141,10 @@ jobs:
             python3 tap.py shot shots/c-farmacia.png
             python3 tap.py has "Farmacia" >> shots/checks.txt
             python3 tap.py has "Buscando" >> shots/checks.txt
+            python3 tap.py text "Reintentar"
+            sleep 45
+            python3 tap.py shot shots/c-farmacia-reintento.png
+            python3 tap.py has "Buscando" >> shots/checks.txt
             python3 tap.py desc "Volver al mapa"
             sleep 2
             echo "== (d) PREVIA LARGA AL CERRO (encuadre sin recorte) ==" >> shots/checks.txt
@@ -148,6 +152,8 @@ jobs:
             sleep 3
             python3 tap.py edit 0
             sleep 1
+            adb shell input keyevent 123
+            for i in $(seq 1 45); do adb shell input keyevent 67; done
             python3 tap.py type "23.11397, -82.37247"
             sleep 2
             adb shell input keyevent 4
@@ -155,8 +161,8 @@ jobs:
             python3 tap.py text "Buscar dirección"
             sleep 8
             python3 tap.py shot shots/d-coordenadas.png
-            python3 tap.py text "Ir"
-            sleep 3
+            python3 tap.py text "Ver en el mapa e ir"
+            sleep 4
             python3 tap.py shot shots/d-tarjeta.png
             python3 tap.py text "Ruta"
             sleep 25
@@ -192,14 +198,16 @@ jobs:
             sleep 3
             python3 tap.py edit 0
             sleep 1
+            adb shell input keyevent 123
+            for i in $(seq 1 45); do adb shell input keyevent 67; done
             python3 tap.py type "23.139100, -82.374800"
             sleep 2
             adb shell input keyevent 4
             sleep 1
             python3 tap.py text "Buscar dirección"
             sleep 8
-            python3 tap.py text "Ir"
-            sleep 3
+            python3 tap.py text "Ver en el mapa e ir"
+            sleep 4
             python3 tap.py text "Ruta"
             sleep 20
             python3 tap.py text "A pie"
